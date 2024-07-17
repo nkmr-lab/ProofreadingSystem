@@ -1,0 +1,116 @@
+/*
+html {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+*/
+body {
+    overflow: hidden; /* 禁止スクロールバーの表示 */
+    min-height: 100vh;
+    /*height: 100%;*/
+}
+
+canvas {
+    border: 1px solid black;
+    touch-action: none; /* Prevent scrolling on touch devices */
+}
+
+#pdf-container {
+    width: 100%;
+    height: 100%;
+    /*height: 94vh;*/
+    overflow: auto;
+    border: 1px solid black;
+}
+
+.playSlider-label {
+    margin-right: 10px;
+}
+
+#thumbnails {
+    display: none; /* サムネイル表示エリアを隠す */
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: white;
+    overflow: auto;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 10px;
+    padding: 10px;
+    box-sizing: border-box;
+    z-index: 10; /* サムネイルを前面に表示 */
+}
+
+.thumbnail {
+    cursor: pointer;
+    /*border: 1px solid black;*/
+    background: white;
+    /* width: 100%; */
+}
+
+#sliderContainer {
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+    width: 100%;
+}
+
+#playSlider {
+    width: 100%;
+    margin-left: 10px;
+}
+
+.file-select-button {
+  position: relative;
+  top: 10px;
+  left: 10px;
+  padding: 10px;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.file-select-button:hover {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+.hidden-file-input {
+  display: none;
+}
+
+.fixed-control {
+    position: fixed;
+    top: 150px;
+    right: 30px;
+    padding: 10px;
+}
+
+.noUiSlider-wrap .inner-block {
+    padding: 50px;
+  }
+  @media screen and (max-width:761px) {
+    .noUiSlider-wrap .inner-block {
+      padding: 26px;
+    }
+  }
+  
+  .noUiSlider-wrap .text-wrap {
+    margin: 10px auto;
+  }
+  
+  .noUi-horizontal .noUi-handle {
+    width: 10px;
+    height: 10px;
+    border-radius: 20px;
+  }
+
+  .noUi-horizontal .noUi-handle::before, .noUi-horizontal .noUi-handle::after  {
+    content: none;
+  }
+  .noUi-connect {
+    background: linear-gradient(rgba(253,187,45,1) 0%, rgba(34,193,195,1) 100%);
+  }
+  
