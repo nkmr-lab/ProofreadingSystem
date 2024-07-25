@@ -67,10 +67,10 @@ function adjustSize(_textSpan, _parentDiv, _foreignObject)
         // console.log(`spanの幅: ${rect.width}`);
         // console.log(`spanの高さ: ${rect.height}`);
 
-        _parentDiv.setAttribute('width', rect.width+8);
+        _parentDiv.setAttribute('width', rect.width+16);
         _parentDiv.setAttribute('height', rect.height);
         // foreignObjectのサイズを調整
-        _foreignObject.setAttribute('width', rect.width+10);
+        _foreignObject.setAttribute('width', rect.width+18);
         _foreignObject.setAttribute('height', rect.height+5);
     });
     
@@ -194,11 +194,11 @@ function createTextareaElement(_scale)
 
 function createSaveButtonElement(){
     let button = document.createElement('button');
-    button.innerText = '✓';
+    button.innerText = ' ';
     button.fontSize = '8pt';
     button.style.position = 'absolute';
     button.style.background = 'orange';
-    button.style.top = '0';
+    button.style.bottom = '0';
     button.style.left = '0';
     button.style.width = '10px';
     button.style.height = '10px';
