@@ -29,7 +29,7 @@
     <label for="zoomSlider">🔎</label>
     <input type="range" id="zoomSlider" min="0.5" max="3" step="0.1" value="1">
     　
-    <?php if (isset($_GET['uuid'])){ ?><input type="button" onclick="location.href='https://pr.nkmr.io/'" value="🏚️"><?php } ?>
+    <?php if (isset($_GET['uuid'])){ ?><input type="button" onclick="location.href='/'" value="🏚️"><?php } ?>
     <div id="sliderContainer">
         <button id="playPauseBtn">⏩️</button>
         <input type="checkbox" id="autoplay" checked>
