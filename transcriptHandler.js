@@ -25,6 +25,10 @@ export function initTranscriptUI(){
   if (btnEl) btnEl.addEventListener('click', onButton);
   const closeBtn = document.getElementById('transcriptClose');
   if (closeBtn) closeBtn.addEventListener('click', () => showPanel(false));
+  const regenBtn = document.getElementById('transcriptRegen');
+  if (regenBtn) regenBtn.addEventListener('click', () => {
+    if (confirm('文字起こしをやり直します（APIを再度呼びます）。よろしいですか？')) generate(true);
+  });
 }
 
 // 閲覧ページ読み込み時。未ログインは transcribe.php が401→静かに終了（UIも出さない）。
@@ -52,17 +56,18 @@ async function onButton(){
   await generate();                                 // 未生成→生成
 }
 
-async function generate(){
+async function generate(force = false){
   const uuid = appState.uuid;
   if (!uuid) return;
   const old = btnEl.textContent;
   btnEl.disabled = true;
   btnEl.textContent = '⏳ 文字起こし中…';
   try {
+    const body = 'uuid=' + encodeURIComponent(uuid) + (force ? '&force=1' : '');
     const res = await fetch('transcribe.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'uuid=' + encodeURIComponent(uuid),
+      body,
     });
     const data = await res.json();
     if (data.status === 'error') throw new Error(data.message || '失敗しました');

@@ -96,7 +96,10 @@ $logoutUrl = nkmrauth_logout_url();
 <div id="transcriptPanel" style="display:none;">
   <div class="transcript-head">
     <span>📝 文字起こし（行をタップでその場面へ）</span>
-    <button id="transcriptClose" class="btn btn--icon" title="閉じる">✕</button>
+    <span style="display:flex; gap:6px;">
+      <button id="transcriptRegen" class="btn btn--icon" title="もう一度文字起こしし直す">🔄</button>
+      <button id="transcriptClose" class="btn btn--icon" title="閉じる">✕</button>
+    </span>
   </div>
   <div id="transcriptList"></div>
 </div>
