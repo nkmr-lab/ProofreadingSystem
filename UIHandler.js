@@ -16,6 +16,7 @@ export function updateButtons() {
         setHidden('recordLocal', true);
         setHidden('recordStop', true);
         setHidden('inputModeBox', true);
+        setHidden('touchModeBox', true);
         setHidden('recIndicator', true);
         setHidden('zipControls', true);
         setHidden('pdfControls', true);

@@ -115,6 +115,23 @@ button:focus-visible, .btn:focus-visible{ outline:2px solid var(--accent); outli
 }
 .input-toggle.active{ background:var(--accent); color:#fff; border-color:var(--accent); }
 
+/* ===== スマホ用「移動/手書き」切替（セグメント） ===== */
+#touchModeBox{ display:inline-flex; align-items:center; gap:0; }
+.tmode{
+  color:var(--muted);
+  padding:0 10px;
+  font-size:12px;
+  border-radius:0;
+  border-left-width:0;
+}
+.tmode:first-child{ border-top-left-radius:var(--radius); border-bottom-left-radius:var(--radius); border-left-width:1px; }
+.tmode:last-child{ border-top-right-radius:var(--radius); border-bottom-right-radius:var(--radius); }
+.tmode.active{ background:var(--accent); color:#fff; border-color:var(--accent); }
+
+/* 端末による出し分け：スマホは移動/手書き切替、PC/iPadは Pen/Touch/Mouse */
+body:not(.is-phone) #touchModeBox{ display:none !important; }
+body.is-phone #inputModeBox{ display:none !important; }
+
 /* ===== ユーザーバッジ ===== */
 .user-badge{
   display:inline-flex;

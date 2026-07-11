@@ -2,7 +2,8 @@ import { changePage, loadPdfFile } from './pdfHandler.js';
 import { undoLast } from './drawingHandler.js';
 import { updateButtons, toggleDrawingMode, initFileInputButton } from './UIHandler.js';
 import { extractUUID } from './subModule.js';
-import { bindInputModeUI, syncStateFromCheckboxes, loadInputSettings, keydownEvent } from './inputHandler.js';
+import { bindInputModeUI, syncStateFromCheckboxes, loadInputSettings, keydownEvent,
+         bindTouchModeUI, loadTouchMode, initDeviceInputUI } from './inputHandler.js';
 import { appState } from './appState.js';
 import { loadDataFromServer, importZipFile } from './storageHandler.js';
 import { startRecordingOnServer, startRecordingOnLocal, stopRecording } from './recordingHandler.js';
@@ -45,6 +46,11 @@ attachViewportGestures(_pdfSVGEl);
 loadInputSettings();
 syncStateFromCheckboxes();
 bindInputModeUI();
+
+// スマホ用「移動/手書き」切替（PC/iPadでは非表示・無効）
+loadTouchMode();
+bindTouchModeUI();
+initDeviceInputUI();
 
 appState.uuid = extractUUID(window.location.href);
 if (appState.uuid) {

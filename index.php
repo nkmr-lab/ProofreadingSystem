@@ -59,6 +59,13 @@ $logoutUrl = nkmrauth_logout_url();
 <button class="input-toggle active" id="allowMouse" data-mode="mouse">Mouse</button>
 </div>
 
+<!-- スマホ限定：1本指の用途を切替（PC/iPadでは非表示） -->
+<div id="touchModeBox">
+<button class="tmode" id="touchModeDraw">✍️手書き</button>
+<button class="tmode" id="touchModeAuto">✨おまかせ</button>
+<button class="tmode" id="touchModeMove">✋移動</button>
+</div>
+
 <button id="recordLocal" class="btn btn--success" disabled>● ローカル録音</button>
 <button id="recordServer" class="btn btn--record" disabled>● サーバー録音</button>
 <button id="recordStop" class="btn btn--danger" disabled>■ 録音終了</button>

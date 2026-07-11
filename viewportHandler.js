@@ -125,6 +125,23 @@ export function applyNormalizedView(view, animate = true) {
   applyTransform(animate);
 }
 
+// ===== 1本指パン（スマホの「移動」用） =====
+// 2本指ジェスチャとは別に、画面座標の移動量で平行移動する。
+// 拡大していない(=収まっている)ときは clampTranslate が中央へ戻すので実質動かない。
+export function panByScreen(dxScreen, dyScreen) {
+  if (!svg) return;
+  tx += dxScreen;
+  ty += dyScreen;
+  clampTranslate();
+  applyTransform(false);
+  maybeLogView(false);
+}
+
+// 1本指パンの終了時に最終表示範囲を確定記録する。
+export function commitPanLog() {
+  maybeLogView(true);
+}
+
 export function resetView(log = false, animate = false) {
   s = 1; tx = 0; ty = 0;
   clampTranslate();
