@@ -1,0 +1,108 @@
+import { startTimeline, stopTimeline, buildTimelinePayload } from './timelineHandler.js';
+import { attachPointerDrawing } from './inputHandler.js';
+import { updateButtons } from './UIHandler.js';
+import { appState } from './appState.js';
+import { ensureUUID, ensureUUIDLocal } from './pdfHandler.js';
+import { startMp4Recording, stopRecordingAndUpload, stopRecUI, stopRecordingLocalOnly } from './audioHandler.js';
+import { setHidden } from './htmlHandler.js';
+import { getPdfBlob, exportLocalRecordingAsZip, saveAnnotations } from './storageHandler.js';
+import { DrawingMode } from './drawingHandler.js';
+import { resetView } from './viewportHandler.js';
+
+export async function startRecordingOnServer(){
+  try {
+    // UUID確保（PDFアップロード＋pushStateで /{uuid} に）
+    appState.recordTarget = 'server';
+    const newUuid = await ensureUUID(appState.uuid);
+    appState.uuid = newUuid;
+    appState.drawingMode = DrawingMode.DRAWING;
+
+    // mp4のみ許可で録音開始
+    await startMp4Recording(newUuid);
+
+    document.getElementById('recordServer').textContent = '● サーバー録音中';
+    setHidden('recordLocal', true);
+    attachPointerDrawing(pdfSVG, appState);
+    startTimeline();
+    resetView(true);   // 表示を全体に戻し、初期の表示範囲を記録
+    updateButtons();
+  } catch (e) {
+    console.error(e);
+    alert(e.message || String(e));
+    updateButtons();
+  }
+}
+
+export async function startRecordingOnLocal(){
+  try {
+    // UUID確保（PDFアップロード＋pushStateで /{uuid} に）
+    appState.recordTarget = 'local';
+    const newUuid = await ensureUUIDLocal(appState.uuid);//ensureUUIDwithDummy(appState.uuid);
+    appState.uuid = newUuid;
+    appState.drawingMode = DrawingMode.DRAWING;
+
+    // mp4のみ許可で録音開始
+    await startMp4Recording(newUuid);
+
+    document.getElementById('recordLocal').textContent = '● ローカル録音中';
+    setHidden('recordServer', true);
+    attachPointerDrawing(pdfSVG, appState);
+    startTimeline();
+    resetView(true);
+  } catch (e) {
+    console.error(e);
+    alert(e.message || String(e));
+  }
+  updateButtons();
+}
+
+export async function stopRecording(){
+  try {
+    if (appState.recordTarget === 'server') {
+      const result = await stopRecordingAndUpload();
+      if( result.status === 'upload_error') {
+        const pdfBlob = await getPdfBlob();
+        await exportLocalRecordingAsZip({ pdfBlob, audioBlob: result.audioBlob, audioExt: 'm4a', });
+        alert('サーバにアップロードできなかったため、チェック結果をダウンロードしました。このファイルを共有して下さい。ZIP読み込みでチェック状況を表示することができます。');
+        setTimeout(()=>location.assign('/'), 100);  
+      } else if( result.status !== 'error' ){
+        await saveAnnotations(buildTimelinePayload());
+        const shareUrl = `https://pr.nkmr.io/${appState.uuid}`;
+        await postReviewResult(shareUrl);   // LabPay校閲連携なら結果URLを書き戻す
+        alert('チェック結果をサーバにアップロードしました。このURLを共有して下さい。');
+        setTimeout(()=>location.assign(`/${appState.uuid}`), 100);
+      }
+    } else if (appState.recordTarget === 'local') {
+      const local = await stopRecordingLocalOnly(); // { uuid, blob, mime }
+      if (!local?.blob) throw new Error('録音データが取得できませんでした');
+      const pdfBlob = await getPdfBlob();
+      await exportLocalRecordingAsZip({ pdfBlob, audioBlob: local.blob, audioExt: 'm4a', });
+      alert('チェック結果をダウンロードしました。このファイルを共有して下さい。ZIP読み込みでチェック状況を表示することができます。');
+      setTimeout(()=>location.assign('/'), 100);
+    }
+  } catch (e) {
+    console.error(e);
+    alert(e.message || String(e));
+  }
+  // 共通の後処理
+  stopTimeline();
+  appState.recordTarget = null;
+  appState.isCheckerMode = false;
+  stopRecUI();
+  updateButtons();
+}
+
+// LabPay の「校閲する」経由なら、保存した校閲URLを元のタスク添付へ返却する。
+async function postReviewResult(resultUrl) {
+  const rc = appState.reviewCb;
+  if (!rc?.cb || !rc?.cbt) return;
+  try {
+    await fetch(rc.cb, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cbt: rc.cbt, resultUrl }),
+    });
+  } catch (e) {
+    console.warn('review result callback failed', e);
+  }
+}

@@ -1,0 +1,265 @@
+/* /var/www/html/pen/pdf_audio/styles.css
+   統一デザインシステム: パレット・タイポ・余白・角丸を一元管理。
+   既存の ID / クラス（JSが参照）は温存し、見た目だけ整える。 */
+
+:root{
+  --bg:#f4f5f7;
+  --surface:#ffffff;
+  --ink:#1f2933;
+  --muted:#6b7280;
+  --border:#e2e5ea;
+  --border-strong:#c8ccd4;
+  --accent:#4f46e5;
+  --accent-hover:#4338ca;
+  --success:#0e9f6e;
+  --success-hover:#0b8457;
+  --danger:#e02424;
+  --danger-hover:#c81e1e;
+  --amber-soft:#fff7e6;
+  --amber-border:#fcd34d;
+  --amber-ink:#92400e;
+  --radius:8px;
+  --radius-lg:14px;
+  --radius-pill:999px;
+  --shadow-sm:0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+  --shadow-md:0 8px 24px rgba(16,24,40,.12);
+  --font:-apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN",
+         "Noto Sans JP", Meiryo, system-ui, sans-serif;
+}
+
+*{ box-sizing:border-box; }
+
+body{
+  overflow:hidden;            /* アプリ側でスクロール管理 */
+  min-height:100vh;
+  margin:0;
+  font-family:var(--font);
+  color:var(--ink);
+  background:var(--bg);
+  -webkit-text-size-adjust:100%;
+}
+
+/* ===== ツールバー ===== */
+.toolbar{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:6px;
+  padding:8px 12px;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  box-shadow:var(--shadow-sm);
+}
+
+/* ===== ボタン基盤 ===== */
+/* 全ボタンを共通の高さに統一（フォント差があっても縦がそろう）。 */
+button, .btn, .input-toggle{
+  box-sizing:border-box;
+  height:32px;
+  line-height:30px;          /* 高さ - 上下ボーダー分。単一行テキストを縦中央に */
+  padding:0 12px;
+  font-family:inherit;
+  font-size:13px;
+  border:1px solid var(--border-strong);
+  border-radius:var(--radius);
+  background:var(--surface);
+  color:var(--ink);
+  cursor:pointer;
+  white-space:nowrap;
+  vertical-align:middle;
+  transition:background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .05s ease;
+  -webkit-appearance:none;
+  appearance:none;
+}
+button:hover:not(:disabled), .btn:hover:not(:disabled){ background:#eef0f3; }
+button:active:not(:disabled){ transform:translateY(1px); }
+button:disabled, .btn:disabled{ opacity:.42; cursor:not-allowed; }
+button:focus-visible, .btn:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+
+/* 意味づけバリアント */
+.btn--icon{ padding:0 10px; font-size:15px; }
+.btn--primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn--primary:hover:not(:disabled){ background:var(--accent-hover); border-color:var(--accent-hover); }
+.btn--secondary{ background:#eef2ff; border-color:#c7d2fe; color:#3730a3; }
+.btn--secondary:hover:not(:disabled){ background:#e0e7ff; }
+.btn--success{ background:var(--success); border-color:var(--success); color:#fff; }
+.btn--success:hover:not(:disabled){ background:var(--success-hover); }
+.btn--record{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn--record:hover:not(:disabled){ background:var(--accent-hover); }
+.btn--danger{ background:var(--danger); border-color:var(--danger); color:#fff; }
+.btn--danger:hover:not(:disabled){ background:var(--danger-hover); }
+.btn--login{ background:var(--amber-soft); border-color:var(--amber-border); color:var(--amber-ink); font-weight:600; margin-left:auto; }
+.btn--login:hover:not(:disabled){ background:#ffedcc; }
+
+/* 描く/消すトグル（JSでクラスを付け替え） */
+#drawing-mode.is-drawing{ background:#fee2e2; border-color:#fca5a5; color:#991b1b; }
+#drawing-mode.is-erasing{ background:#e0e7ff; border-color:#c7d2fe; color:#3730a3; }
+
+/* ===== 再生速度 ===== */
+.speedButtons{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  font-size:12px;
+  color:var(--muted);
+}
+.speedBtn{ padding:0 9px; font-size:12px; }
+.speedBtn.active{ background:var(--accent); border-color:var(--accent); color:#fff; }
+
+/* ===== 入力モード切替 ===== */
+#inputModeBox{ display:inline-flex; align-items:center; gap:4px; }
+.input-toggle{
+  color:var(--muted);
+  padding:0 9px;
+  font-size:12px;
+}
+.input-toggle.active{ background:var(--accent); color:#fff; border-color:var(--accent); }
+
+/* ===== ユーザーバッジ ===== */
+.user-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin-left:auto;
+  font-size:12px;
+  color:var(--muted);
+  background:#eef0f3;
+  padding:5px 10px 5px 8px;
+  border-radius:var(--radius-pill);
+}
+.user-badge a{ color:var(--accent); text-decoration:none; }
+.user-badge a:hover{ text-decoration:underline; }
+
+/* ===== 録音インジケータ ===== */
+.recIndicator{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  font-weight:700;
+  color:var(--danger);
+  margin-left:4px;
+}
+.recIndicator.blink{ animation:blink 1s steps(2, start) infinite; }
+@keyframes blink { to { visibility:hidden; } }
+
+.recLevel{
+  display:inline-block;
+  width:44px;
+  height:10px;
+  border:1px solid var(--danger);
+  border-radius:var(--radius);
+  position:relative;
+  overflow:hidden;
+}
+.recLevel::before{
+  content:"";
+  position:absolute;
+  left:0; top:0; bottom:0;
+  width:var(--level, 0%);
+  background:var(--danger);
+}
+.recTimer{
+  font-variant-numeric:tabular-nums;
+  font-weight:700;
+  color:var(--ink);
+  margin-left:4px;
+}
+
+/* ===== PDF 表示領域 ===== */
+#pdf-container{
+  width:100%;
+  height:100%;
+  overflow:auto;
+  background:#eceef1;
+  display:flex;
+  justify-content:center;
+  align-items:flex-start;
+  padding-top:0;
+}
+#pdfSVG{
+  background:#fff;
+  box-shadow:var(--shadow-md);
+  outline:1px solid rgba(16,24,40,.12);
+  touch-action:none;
+}
+#pdf-container, #pdfSVG{
+  touch-action:none;
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-touch-callout:none;
+}
+#pdf-container .page{
+  background:#fff;
+  margin:16px auto;
+  box-shadow:var(--shadow-md);
+  outline:1px solid rgba(16,24,40,.18);
+  align-items:center;
+}
+#ink-canvas{ position:absolute; top:0; left:0; }
+.pdfjs-canvas{ border:none; }
+
+/* ===== 音声プレイヤー ===== */
+#audioPlayer{ width:100%; margin-top:2px; }
+
+/* ===== 補助クラス ===== */
+.hidden-file-input{ display:none; }
+.hidden{ display:none; }
+
+/* ===== 使い方カード ===== */
+#description{
+  max-width:640px;
+  margin:40px auto;
+  padding:32px;
+  background:var(--surface);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-md);
+}
+#description h2{
+  text-align:center;
+  margin:0 0 28px;
+  font-size:22px;
+  color:var(--ink);
+}
+.steps{ display:flex; flex-direction:column; gap:16px; }
+.step{
+  display:flex;
+  align-items:flex-start;
+  gap:16px;
+  padding:16px;
+  border-radius:12px;
+  background:#f7f8fa;
+  border:1px solid var(--border);
+  transition:transform .18s ease, box-shadow .18s ease;
+}
+.step:hover{ transform:translateY(-2px); box-shadow:var(--shadow-sm); }
+.step-number{
+  flex:0 0 auto;
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  background:var(--accent);
+  color:#fff;
+  font-weight:700;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:18px;
+}
+.step-content h3{ margin:0 0 5px; font-size:17px; color:var(--ink); }
+.step-content p{ margin:0; font-size:14px; line-height:1.7; color:var(--muted); }
+
+/* タップでPDF読込にできるステップ */
+.js-load-pdf{ cursor:pointer; border-color:var(--accent); }
+.js-load-pdf:hover{ background:#eef2ff; border-color:var(--accent); box-shadow:var(--shadow-sm); }
+.js-load-pdf:active{ transform:translateY(0); }
+.js-load-pdf .step-number{ background:var(--accent); }
+.tap-hint{ margin-top:8px !important; color:var(--accent) !important; font-weight:600; font-size:13px !important; }
+
+/* ===== モバイル ===== */
+@media (max-width:640px){
+  .toolbar{ padding:6px 8px; gap:5px; }
+  button, .btn, .input-toggle{ height:30px; line-height:28px; font-size:12px; padding:0 9px; }
+  .btn--login, .user-badge{ margin-left:0; }
+  #description{ margin:24px 14px; padding:22px; }
+  #description h2{ font-size:20px; }
+}

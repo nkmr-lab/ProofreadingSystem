@@ -1,79 +1,90 @@
-import { changePage, loadPDF, loadAnnotations, sharePDF } from './pdfHandler.js';
-import { startDrawing, stopDrawing, doDrawing, redrawPaths, undoLast, setUUID, setDrawingMode, READING, isEditing } from './drawingHandler.js';
-import { showThumbnails } from './thumbnailHandler.js';
-import { updateButtons, handlePlayPause, toggleDrawingMode, changeInteractionMode, initPressureRangeSlider, initDragAndDropUI } from './UIHandler.js';
+import { changePage, loadPdfFile } from './pdfHandler.js';
+import { undoLast } from './drawingHandler.js';
+import { updateButtons, toggleDrawingMode, initFileInputButton } from './UIHandler.js';
 import { extractUUID } from './subModule.js';
+import { bindInputModeUI, syncStateFromCheckboxes, loadInputSettings, keydownEvent } from './inputHandler.js';
+import { appState } from './appState.js';
+import { loadDataFromServer, importZipFile } from './storageHandler.js';
+import { startRecordingOnServer, startRecordingOnLocal, stopRecording } from './recordingHandler.js';
+import { initViewport, attachViewportGestures } from './viewportHandler.js';
 
-document.getElementById('playPauseBtn').addEventListener('click', handlePlayPause);
-document.getElementById('playSlider').addEventListener('input',()=>redrawPaths(parseInt(playSlider.value, 10)));
-//document.getElementById('save-json').addEventListener('click', saveJSON);
-//document.getElementById('load-json').addEventListener('click', loadJSON);
+document.addEventListener('keydown', (event) => keydownEvent(event));
 document.getElementById('next-page').addEventListener('click', () => changePage(1));
 document.getElementById('prev-page').addEventListener('click', () => changePage(-1));
-document.addEventListener('keydown', function(event) {
-    if(isEditing() === false){
-        switch(event.key) {
-        case 'ArrowRight':
-            changePage(1);
-            break;
-        case 'ArrowLeft':
-            changePage(-1);
-            break;
-        }
-    }
-});
 document.getElementById('undo').addEventListener('click', undoLast);
 document.getElementById('drawing-mode').addEventListener('click', toggleDrawingMode);
-document.getElementById('show-thumbnails').addEventListener('click', () => showThumbnails(false));
-document.getElementById('filter-pages').addEventListener('click', () => showThumbnails(true));
-document.getElementById('share').addEventListener('click', sharePDF);
-document.getElementById('autoplay').addEventListener('click', handlePlayPause);
+document.getElementById('importZipBtn')?.addEventListener('click', () => { document.getElementById('importZipInput')?.click(); });
+document.getElementById('importZipInput')?.addEventListener('change', importZipFile);
+document.getElementById('recordServer')?.addEventListener('click', startRecordingOnServer);
+document.getElementById('recordLocal')?.addEventListener('click', startRecordingOnLocal);
+document.getElementById('recordStop')?.addEventListener('click', stopRecording);
 
-const pdfSVG = document.getElementById('pdf-svg');
-pdfSVG.addEventListener('mousedown', startDrawing);
-pdfSVG.addEventListener('mouseup', stopDrawing);
-pdfSVG.addEventListener('mousemove', doDrawing);
-pdfSVG.addEventListener('touchstart', startDrawing, { passive: false });
-pdfSVG.addEventListener('touchend', stopDrawing, { passive: false });
-pdfSVG.addEventListener('touchmove', doDrawing, { passive: false });
+// nkmr SSO ログイン状態。サーバー録音はログイン時のみ有効。
+appState.loggedIn = document.getElementById('bodyContent')?.dataset?.loggedin === '1';
+document.getElementById('loginServerBtn')?.addEventListener('click', (e) => {
+  const u = e.currentTarget?.dataset?.login;
+  if (u) location.href = u;
+});
 
-const playSlider = document.getElementById('playSlider');
+// 使い方カードの「PDFを読み込む」ステップをタップ→PDF読込（PDF読込ボタンと同じ動作）
+document.querySelectorAll('.js-load-pdf').forEach((el) => {
+  const openPicker = () => document.getElementById('file-select-button')?.click();
+  el.addEventListener('click', openPicker);
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPicker(); }
+  });
+});
 
-const urlParams = new URLSearchParams(window.location.search);
-let uuid = urlParams.get('uuid');
-if(!uuid){
-    uuid = extractUUID(window.location.href);
-}
-const defaultPressureMin = urlParams.get('min') != null ? urlParams.get('min') : 0;
-const defaultPressureMax = urlParams.get('max') != null ? urlParams.get('max') : 1;
+appState.isCheckerMode = document.getElementById('bodyContent')?.dataset?.checker === '1';
 
-initPressureRangeSlider(defaultPressureMin, defaultPressureMax);
+// 部分拡大（ピンチ/パン）の初期化。記録側・閲覧側の両方で有効。
+const _pdfSVGEl = document.getElementById('pdfSVG');
+initViewport(_pdfSVGEl, document.getElementById('pdf-container'));
+attachViewportGestures(_pdfSVGEl);
 
-if (uuid) {
-    setUUID(uuid);
-    console.log("loading...");
+loadInputSettings();
+syncStateFromCheckboxes();
+bindInputModeUI();
 
-    setDrawingMode(READING);
-    document.getElementById('drawing-mode').innerText = "描く 書く 消す [閲覧]";
-    document.getElementById('drawing-mode').style.background = "#ffffcc";
-    changeInteractionMode(READING);
-
-    fetch(`api.php?uuid=${uuid}`)
-        .then(response => response.json())
-        .then(data => {
-            console.log(data);
-            if (data.status === 'error') {
-                alert('Failed to load PDF: ' + data.message);
-            } else {
-                loadPDF(data.pdf);
-                loadAnnotations(data.annotations);
-                updateButtons();
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-        });
+appState.uuid = extractUUID(window.location.href);
+if (appState.uuid) {
+  appState.isCheckerMode = false;
+  await loadDataFromServer(appState.uuid);
 } else {
-    // ドラッグアンドドロップ機能
-    initDragAndDropUI();
+  initFileInputButton();
+  await maybeLoadFromHandoff();   // LabPay からの原稿受け取り
+}
+updateButtons();
+
+// LabPay の「校閲する」で開かれた場合、?src の原稿(PDF)を取得して校閲モードに載せる。
+// src は pay.nkmr.io 限定。校閲結果の返却先(cb/cbt)は appState に保持し、URLからは消す。
+async function maybeLoadFromHandoff() {
+  const p = new URLSearchParams(location.search);
+  const src = p.get('src');
+  if (!src) return;
+
+  let u;
+  try { u = new URL(src); } catch { return; }
+  if (u.protocol !== 'https:' || u.hostname !== 'pay.nkmr.io') {
+    alert('不正な転送元です。');
+    return;
+  }
+
+  const cb = p.get('cb'), cbt = p.get('cbt');
+  if (cb && cbt) {
+    try { if (new URL(cb).hostname === 'pay.nkmr.io') appState.reviewCb = { cb, cbt }; } catch {}
+  }
+
+  try {
+    const res = await fetch(src);   // トークン付きURL。cookie不要（CORS許可済）
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const blob = await res.blob();
+    const title = p.get('title') || 'document.pdf';
+    loadPdfFile(new File([blob], title, { type: 'application/pdf' }));
+    // トークンをアドレスバー/共有に残さない
+    history.replaceState({}, '', location.pathname);
+  } catch (e) {
+    console.error(e);
+    alert('原稿の取得に失敗しました: ' + (e?.message || e));
+  }
 }
