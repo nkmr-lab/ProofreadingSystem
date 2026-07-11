@@ -4,6 +4,7 @@ import { buildTimelinePayload, loadTimelinePayload, attachAudioSync, applyAtTime
 import { getUploadedPDFFile, setUploadedPDFFile, loadPDF, loadAnnotations } from './pdfHandler.js';
 import { setAudioSourceOrFallback } from './audioHandler.js';
 import { loadSilenceProfile, attachSilenceSkip } from './silenceHandler.js';
+import { loadTranscript } from './transcriptHandler.js';
 import { appState } from './appState.js';
 import { getLocalTimeString } from './subModule.js';
 
@@ -52,6 +53,9 @@ export async function loadDataFromServer(_uuid){
       // 自分の校正（または所有者未記録の旧データ）なら削除ボタンを出す
       const delBtn = document.getElementById('deleteReview');
       if (delBtn) delBtn.style.display = data.canDelete ? '' : 'none';
+
+      // 文字起こし（ログイン限定）。未ログインなら transcribe.php が401→UIは出ない
+      if (data.audio) loadTranscript(_uuid);
 
       updateButtons();
   })

@@ -1,2 +1,5 @@
 ﻿files/*
 !files/README.txt
+
+# サーバのみの機密（OpenAI APIキー等）。公開リポジトリに絶対入れない。
+config.local.php

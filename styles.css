@@ -218,6 +218,51 @@ body.is-phone #inputModeBox{ display:none !important; }
 /* ===== 音声プレイヤー ===== */
 #audioPlayer{ width:100%; margin-top:2px; }
 
+/* ===== 文字起こし（同期字幕）ボトムシート ===== */
+#transcriptPanel{
+  position:fixed;
+  left:0; right:0; bottom:0;
+  max-height:42vh;
+  display:flex;
+  flex-direction:column;
+  background:var(--surface);
+  border-top:1px solid var(--border);
+  box-shadow:0 -8px 24px rgba(16,24,40,.14);
+  z-index:50;
+}
+.transcript-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:8px 12px;
+  font-size:13px;
+  font-weight:600;
+  color:var(--muted);
+  border-bottom:1px solid var(--border);
+}
+#transcriptList{ overflow-y:auto; padding:6px 8px; -webkit-overflow-scrolling:touch; }
+.cap-row{
+  display:flex;
+  gap:10px;
+  align-items:baseline;
+  padding:6px 8px;
+  border-radius:var(--radius);
+  cursor:pointer;
+  line-height:1.6;
+}
+.cap-row:hover{ background:#eef2ff; }
+.cap-row.active{ background:#e0e7ff; }
+.cap-row.active .cap-x{ color:var(--ink); font-weight:600; }
+.cap-t{
+  flex:0 0 auto;
+  font-variant-numeric:tabular-nums;
+  font-size:12px;
+  color:var(--accent);
+  min-width:42px;
+}
+.cap-x{ color:var(--ink); font-size:14px; }
+
 /* ===== 補助クラス ===== */
 .hidden-file-input{ display:none; }
 .hidden{ display:none; }

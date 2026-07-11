@@ -9,6 +9,7 @@ import { loadDataFromServer, importZipFile, deleteReviewFromServer } from './sto
 import { startRecordingOnServer, startRecordingOnLocal, stopRecording } from './recordingHandler.js';
 import { initViewport, attachViewportGestures } from './viewportHandler.js';
 import { loadSkipSetting, bindSkipSilenceUI } from './silenceHandler.js';
+import { initTranscriptUI } from './transcriptHandler.js';
 
 document.addEventListener('keydown', (event) => keydownEvent(event));
 document.getElementById('next-page').addEventListener('click', () => changePage(1));
@@ -57,6 +58,9 @@ initDeviceInputUI();
 // 無音スキップ（閲覧ページ）
 loadSkipSetting();
 bindSkipSilenceUI();
+
+// 文字起こし（研究室ログイン限定・閲覧ページ）
+initTranscriptUI();
 
 appState.uuid = extractUUID(window.location.href);
 if (appState.uuid) {

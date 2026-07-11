@@ -36,6 +36,9 @@ $logoutUrl = nkmrauth_logout_url();
 </div>
 
 <button id="skipSilence" class="btn speedBtn" title="喋っていない区間を自動で飛ばす" style="display:none;">⏭️ 無音スキップ</button>
+<?php if ($me): // 文字起こしは研究室ログイン限定 ?>
+<button id="genTranscript" class="btn btn--secondary" style="display:none;">📝 文字起こし</button>
+<?php endif; ?>
 
 <input type="file" id="file-input" class="hidden-file-input" />
 
@@ -88,6 +91,16 @@ $logoutUrl = nkmrauth_logout_url();
 </div>
 
 <audio id="audioPlayer" controls style="width:100%;"></audio>
+
+<?php if ($me): // 同期字幕パネル（研究室ログイン限定） ?>
+<div id="transcriptPanel" style="display:none;">
+  <div class="transcript-head">
+    <span>📝 文字起こし（行をタップでその場面へ）</span>
+    <button id="transcriptClose" class="btn btn--icon" title="閉じる">✕</button>
+  </div>
+  <div id="transcriptList"></div>
+</div>
+<?php endif; ?>
 
 <div id="pdf-container">
     <svg id="pdfSVG" width="100%" height="100%"></svg>
