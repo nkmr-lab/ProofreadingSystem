@@ -123,12 +123,32 @@ if ($method === 'POST') {
     if (!is_file($audio)) j_err('音声が見つかりません', 404);
     if (filesize($audio) > 25 * 1024 * 1024) j_err('音声が大きすぎます（Whisperの25MB上限）', 413);
 
+    // ffmpeg 前処理：ボソボソ音声を持ち上げて認識精度を上げる（あれば使う・失敗しても原音で続行）。
+    //   highpass=低域ノイズ除去 / speechnorm=発話音量の正規化 / 16kHz mono AAC（Whisperは16k想定）。
+    //   長さは変わらないのでタイムスタンプはそのまま。
+    $sendPath = $audio;
+    $tmpNorm = null;
+    $ff = '/usr/bin/ffmpeg';
+    if (is_executable($ff)) {
+        $tmpNorm = sys_get_temp_dir() . '/tr_' . $uuid . '_' . getmypid() . '.m4a';
+        $cmd = escapeshellarg($ff) . ' -y -i ' . escapeshellarg($audio)
+             . ' -ac 1 -ar 16000 -af ' . escapeshellarg('highpass=f=80,speechnorm=e=12.5:r=0.0001:l=1')
+             . ' -c:a aac -b:a 64k ' . escapeshellarg($tmpNorm) . ' 2>/dev/null';
+        @exec($cmd, $_o, $rc);
+        if ($rc === 0 && is_file($tmpNorm) && filesize($tmpNorm) > 1000) {
+            $sendPath = $tmpNorm;
+        } else {
+            if ($tmpNorm && is_file($tmpNorm)) @unlink($tmpNorm);
+            $tmpNorm = null;
+        }
+    }
+
     $ch = curl_init('https://api.openai.com/v1/audio/transcriptions');
     curl_setopt_array($ch, [
         CURLOPT_POST => true,
         CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $OPENAI_KEY],
         CURLOPT_POSTFIELDS => [
-            'file'            => new CURLFile($audio, 'audio/mp4', $uuid . '.m4a'),
+            'file'            => new CURLFile($sendPath, 'audio/mp4', $uuid . '.m4a'),
             'model'           => 'whisper-1',
             'response_format' => 'verbose_json',
             'language'        => 'ja',
@@ -141,6 +161,8 @@ if ($method === 'POST') {
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $cerr = curl_error($ch);
     curl_close($ch);
+
+    if ($tmpNorm && is_file($tmpNorm)) @unlink($tmpNorm);   // 正規化一時ファイルを掃除
 
     if ($resp === false) j_err('OpenAI接続に失敗: ' . $cerr, 502);
     if ($code < 200 || $code >= 300) j_err('文字起こしAPIエラー(HTTP ' . $code . '): ' . substr($resp, 0, 300), 502);
