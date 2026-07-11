@@ -8,6 +8,7 @@ export function updateButtons() {
         // 学生側：ページボタンも描画もundoも不要（＝触らせない）
         setHidden('speedButtons', false);
         setHidden('audioPlayer', false);
+        setHidden('skipSilence', false);   // 無音スキップは閲覧時のみ
         setHidden('prev-page', true);
         setHidden('next-page', true);
         setHidden('drawing-mode', true);

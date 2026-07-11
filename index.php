@@ -35,6 +35,8 @@ $logoutUrl = nkmrauth_logout_url();
     <button type="button" class="btn speedBtn" data-rate="2.0">×2.0</button>
 </div>
 
+<button id="skipSilence" class="btn speedBtn" title="喋っていない区間を自動で飛ばす" style="display:none;">⏭️ 無音スキップ</button>
+
 <input type="file" id="file-input" class="hidden-file-input" />
 
 <button id="prev-page" class="btn btn--neutral" disabled>＜前</button>

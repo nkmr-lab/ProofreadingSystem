@@ -8,6 +8,7 @@ import { appState } from './appState.js';
 import { loadDataFromServer, importZipFile, deleteReviewFromServer } from './storageHandler.js';
 import { startRecordingOnServer, startRecordingOnLocal, stopRecording } from './recordingHandler.js';
 import { initViewport, attachViewportGestures } from './viewportHandler.js';
+import { loadSkipSetting, bindSkipSilenceUI } from './silenceHandler.js';
 
 document.addEventListener('keydown', (event) => keydownEvent(event));
 document.getElementById('next-page').addEventListener('click', () => changePage(1));
@@ -52,6 +53,10 @@ bindInputModeUI();
 loadTouchMode();
 bindTouchModeUI();
 initDeviceInputUI();
+
+// 無音スキップ（閲覧ページ）
+loadSkipSetting();
+bindSkipSilenceUI();
 
 appState.uuid = extractUUID(window.location.href);
 if (appState.uuid) {

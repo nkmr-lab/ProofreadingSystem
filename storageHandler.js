@@ -3,6 +3,7 @@ import { updateButtons } from './UIHandler.js';
 import { buildTimelinePayload, loadTimelinePayload, attachAudioSync, applyAtTimeMs } from './timelineHandler.js';
 import { getUploadedPDFFile, setUploadedPDFFile, loadPDF, loadAnnotations } from './pdfHandler.js';
 import { setAudioSourceOrFallback } from './audioHandler.js';
+import { loadSilenceProfile, attachSilenceSkip } from './silenceHandler.js';
 import { appState } from './appState.js';
 import { getLocalTimeString } from './subModule.js';
 
@@ -38,6 +39,10 @@ export async function loadDataFromServer(_uuid){
 
           // 音声再生と同期（play/seeking で applyAtTimeMs を呼ぶ）
           attachAudioSync(audioEl);
+
+          // 無音スキップ：発話区間を解析してから有効化（解析は非同期・失敗しても再生継続）
+          attachSilenceSkip(audioEl);
+          loadSilenceProfile(data.audio);
 
           // 読み込み直後（再生前）でも、現在の再生位置（通常0秒）に合わせて状態を反映
           const tMs = (audioEl.currentTime || 0) * 1000;
@@ -234,6 +239,8 @@ export async function importDataZipFile(zipFile){
       // iPhoneは load直後 currentTime が取れない/NaN になることがあるので
       audioPlayer.onloadedmetadata = () => {
         attachAudioSync(audioPlayer);
+        attachSilenceSkip(audioPlayer);
+        loadSilenceProfile(audioPlayer.src);
         const tMs = (audioPlayer.currentTime || 0) * 1000;
         applyAtTimeMs(tMs);
       };
