@@ -44,11 +44,35 @@ export async function loadDataFromServer(_uuid){
           applyAtTimeMs(tMs);
       }
 
+      // 自分の校正（または所有者未記録の旧データ）なら削除ボタンを出す
+      const delBtn = document.getElementById('deleteReview');
+      if (delBtn) delBtn.style.display = data.canDelete ? '' : 'none';
+
       updateButtons();
   })
   .catch((error) => {
       console.error('Error:', error);
   });
+}
+
+// 校正の削除（作成者のみ。サーバ側でも権限チェック）。
+export async function deleteReviewFromServer(_uuid){
+  if (!_uuid) return;
+  if (!confirm('この校正（PDF・音声・手書き）を削除します。元に戻せません。よろしいですか？')) return;
+  try {
+    const res = await fetch('api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', uuid: _uuid }),
+    });
+    const result = await res.json();
+    if (result.status !== 'success') throw new Error(result.message || '削除に失敗しました');
+    alert('削除しました。');
+    location.assign('/');
+  } catch (e) {
+    console.error(e);
+    alert(e.message || String(e));
+  }
 }
 
 export function saveJSON(_paths) {

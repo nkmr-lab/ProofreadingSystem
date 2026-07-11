@@ -26,6 +26,7 @@ $logoutUrl = nkmrauth_logout_url();
 <body id="bodyContent" data-checker="<?php echo isset($_GET['uuid']) ? '0' : '1'; ?>" data-loggedin="<?php echo $me ? '1' : '0'; ?>">
 <div class="toolbar">
 <input type="button" id='homeButton' class="btn btn--icon" onclick="location.href='/'" value="🏚️">
+<button id="deleteReview" class="btn btn--danger" style="display:none;">🗑️削除</button>
 <div id="speedButtons" class="speedButtons">
     再生速度：
     <button type="button" class="btn speedBtn" data-rate="1.0">×1.0</button>

@@ -48,6 +48,46 @@ function file_exists_for_uuid($dir, $uuid) {
     return file_exists(safe_path($dir, $uuid, 'pdf'));
 }
 
+// 所有者メタは Web 非公開の meta/ に置く（files/ は直アクセス可なのでメール流出を防ぐ）。
+function meta_dir() {
+    $d = __DIR__ . '/meta/';
+    if (!is_dir($d)) {
+        @mkdir($d, 0755, true);
+        @file_put_contents($d . '.htaccess', "Require all denied\n");
+    }
+    return $d;
+}
+function owner_path($uuid) { return meta_dir() . $uuid . '.json'; }
+function read_owner($uuid) {
+    $p = owner_path($uuid);
+    if (!is_file($p)) return null;
+    $j = json_decode(@file_get_contents($p), true);
+    return is_array($j) ? $j : null;
+}
+function write_owner($uuid, $me) {
+    @file_put_contents(owner_path($uuid), json_encode([
+        'email'   => $me['email'] ?? '',
+        'name'    => $me['name'] ?? '',
+        'created' => gmdate('c'),
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), LOCK_EX);
+}
+// 削除可否：ログイン中 && (自分が所有者 || 所有者未記録の旧データ)。
+function can_delete($uuid, $me) {
+    if (!$me) return false;
+    $o = read_owner($uuid);
+    if (!$o) return true;   // 所有者未記録（旧データ）はログインしていれば可
+    return isset($o['email']) && hash_equals((string)$o['email'], (string)($me['email'] ?? ''));
+}
+// uuid に紐づく全ファイルを削除。
+function delete_uuid_files($dir, $uuid) {
+    foreach (['pdf', 'json', 'm4a'] as $ext) {
+        $p = safe_path($dir, $uuid, $ext);
+        if (is_file($p)) @unlink($p);
+    }
+    $op = owner_path($uuid);
+    if (is_file($op)) @unlink($op);
+}
+
 function sniff_pdf($tmpPath) {
     $fh = fopen($tmpPath, 'rb');
     if (!$fh) return false;
@@ -81,13 +121,25 @@ if ($method === 'POST') {
     // ---- 1) JSON保存（raw JSON: {uuid, data}）----
     $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
     if (stripos($contentType, 'application/json') !== false) {
-        require_login();
+        $me = require_login();
         $raw = file_get_contents('php://input', false, null, 0, MAX_JSON_BYTES + 1);
         if ($raw === false) json_error('Failed to read request body');
         if (strlen($raw) > MAX_JSON_BYTES) json_error('JSON too large');
 
         $input = json_decode($raw, true);
-        if (!is_array($input) || !isset($input['uuid']) || !isset($input['data'])) {
+        if (!is_array($input)) json_error('Invalid JSON payload');
+
+        // ---- 1a) 削除（{action:'delete', uuid}）----
+        if (($input['action'] ?? '') === 'delete') {
+            $uuid = $input['uuid'] ?? '';
+            if (!is_valid_uuid($uuid)) json_error('Invalid uuid');
+            if (!can_delete($uuid, $me)) json_error('削除する権限がありません（作成者のみ削除できます）', 403);
+            delete_uuid_files($targetDir, $uuid);
+            echo json_encode(['status' => 'success']);
+            exit;
+        }
+
+        if (!isset($input['uuid']) || !isset($input['data'])) {
             json_error('Invalid JSON payload');
         }
 
@@ -151,7 +203,7 @@ if ($method === 'POST') {
 
     // ---- 3) PDFアップロード（multipart: file）----
     if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
-        require_login();
+        $me = require_login();
 
         if ($_FILES['file']['size'] > MAX_PDF_BYTES) json_error('PDF too large');
 
@@ -164,6 +216,9 @@ if ($method === 'POST') {
         $targetFile = safe_path($targetDir, $uuid, 'pdf');
 
         if (!move_uploaded_file($tmp, $targetFile)) json_error('Failed to upload file', 500);
+
+        // 作成時に所有者を記録（本人だけが削除できるように）
+        write_owner($uuid, $me);
 
         echo json_encode(['uuid' => $uuid]);
         exit;
@@ -190,6 +245,9 @@ if ($method === 'GET' && isset($_GET['uuid'])) {
             'annotations' => $jsonData
         ];
         if (file_exists($audioFile)) $resp['audio'] = 'files/' . $uuid . '.m4a';
+
+        // ログイン中で、自分の校正（または所有者未記録の旧データ）なら削除可
+        $resp['canDelete'] = can_delete($uuid, nkmrauth_identity());
 
         echo json_encode($resp, JSON_UNESCAPED_SLASHES);
         exit;

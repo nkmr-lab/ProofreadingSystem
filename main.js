@@ -5,7 +5,7 @@ import { extractUUID } from './subModule.js';
 import { bindInputModeUI, syncStateFromCheckboxes, loadInputSettings, keydownEvent,
          bindTouchModeUI, loadTouchMode, initDeviceInputUI } from './inputHandler.js';
 import { appState } from './appState.js';
-import { loadDataFromServer, importZipFile } from './storageHandler.js';
+import { loadDataFromServer, importZipFile, deleteReviewFromServer } from './storageHandler.js';
 import { startRecordingOnServer, startRecordingOnLocal, stopRecording } from './recordingHandler.js';
 import { initViewport, attachViewportGestures } from './viewportHandler.js';
 
@@ -19,6 +19,7 @@ document.getElementById('importZipInput')?.addEventListener('change', importZipF
 document.getElementById('recordServer')?.addEventListener('click', startRecordingOnServer);
 document.getElementById('recordLocal')?.addEventListener('click', startRecordingOnLocal);
 document.getElementById('recordStop')?.addEventListener('click', stopRecording);
+document.getElementById('deleteReview')?.addEventListener('click', () => deleteReviewFromServer(appState.uuid));
 
 // nkmr SSO ログイン状態。サーバー録音はログイン時のみ有効。
 appState.loggedIn = document.getElementById('bodyContent')?.dataset?.loggedin === '1';
