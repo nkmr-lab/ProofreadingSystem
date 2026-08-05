@@ -110,6 +110,13 @@ $logoutUrl = nkmrauth_logout_url();
     <svg id="pdfSVG" width="100%" height="100%"></svg>
 </div>
 
+<?php if ($me): // 自分のチェック履歴（ログイン時のみ） ?>
+<div id="historyBox" style="display:none;">
+  <h2>📋 あなたのチェック履歴</h2>
+  <div id="historyList"></div>
+</div>
+<?php endif; ?>
+
 <div id="description">
   <h2>システムの使い方</h2>
 

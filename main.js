@@ -10,6 +10,7 @@ import { startRecordingOnServer, startRecordingOnLocal, stopRecording } from './
 import { initViewport, attachViewportGestures } from './viewportHandler.js';
 import { loadSkipSetting, bindSkipSilenceUI } from './silenceHandler.js';
 import { initTranscriptUI } from './transcriptHandler.js';
+import { loadMyHistory } from './historyHandler.js';
 
 document.addEventListener('keydown', (event) => keydownEvent(event));
 document.getElementById('next-page').addEventListener('click', () => changePage(1));
@@ -92,6 +93,7 @@ if (appState.uuid) {
 } else {
   initFileInputButton();
   await maybeLoadFromHandoff();   // LabPay からの原稿受け取り
+  loadMyHistory();               // ホーム：自分のチェック履歴（ログイン時のみ）
 }
 updateButtons();
 

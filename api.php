@@ -64,10 +64,11 @@ function read_owner($uuid) {
     $j = json_decode(@file_get_contents($p), true);
     return is_array($j) ? $j : null;
 }
-function write_owner($uuid, $me) {
+function write_owner($uuid, $me, $title = '') {
     @file_put_contents(owner_path($uuid), json_encode([
         'email'   => $me['email'] ?? '',
         'name'    => $me['name'] ?? '',
+        'title'   => $title,
         'created' => gmdate('c'),
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), LOCK_EX);
 }
@@ -86,6 +87,31 @@ function delete_uuid_files($dir, $uuid) {
     }
     $op = owner_path($uuid);
     if (is_file($op)) @unlink($op);
+    $wf = meta_dir() . $uuid . '.whisper.json';   // 文字起こしキャッシュも消す
+    if (is_file($wf)) @unlink($wf);
+}
+
+// 現在のユーザーが所有する校正の一覧（新しい順）。meta/{uuid}.json を走査。
+function list_my_reviews($filesDir, $me) {
+    $meEmail = strtolower(trim($me['email'] ?? ''));
+    $items = [];
+    $metaDir = meta_dir();
+    foreach (@scandir($metaDir) ?: [] as $fn) {
+        if (!preg_match('/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.json$/i', $fn, $m)) continue;
+        $o = json_decode(@file_get_contents($metaDir . $fn), true);
+        if (!is_array($o)) continue;
+        if (strtolower(trim($o['email'] ?? '')) !== $meEmail || $meEmail === '') continue;
+        $u = $m[1];
+        if (!is_file($filesDir . $u . '.pdf')) continue;   // 実体が無いものは除外
+        $items[] = [
+            'uuid'    => $u,
+            'title'   => $o['title'] ?? '',
+            'created' => $o['created'] ?? '',
+            'hasAudio'=> is_file($filesDir . $u . '.m4a'),
+        ];
+    }
+    usort($items, fn($a, $b) => strcmp($b['created'], $a['created']));
+    return $items;
 }
 
 function sniff_pdf($tmpPath) {
@@ -217,14 +243,28 @@ if ($method === 'POST') {
 
         if (!move_uploaded_file($tmp, $targetFile)) json_error('Failed to upload file', 500);
 
+        // タイトル＝アップロードされた元ファイル名（履歴表示用）
+        $title = '';
+        if (isset($_FILES['file']['name'])) {
+            $title = preg_replace('/[\x00-\x1f]/', '', (string)$_FILES['file']['name']);
+            $title = mb_substr(basename($title), 0, 200);
+        }
+
         // 作成時に所有者を記録（本人だけが削除できるように）
-        write_owner($uuid, $me);
+        write_owner($uuid, $me, $title);
 
         echo json_encode(['uuid' => $uuid]);
         exit;
     }
 
     json_error('Invalid request or file upload error', 400);
+}
+
+// ---- GET: 自分の履歴一覧（ログイン必須）----
+if ($method === 'GET' && ($_GET['action'] ?? '') === 'mine') {
+    $me = require_login();
+    echo json_encode(['status' => 'success', 'items' => list_my_reviews($targetDir, $me)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
 }
 
 // ---- GET: uuid で取得 ----
