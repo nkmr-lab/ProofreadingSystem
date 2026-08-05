@@ -43,6 +43,7 @@ export async function loadTranscript(uuid){
       segments = data.segments;
       renderCaptions();
       btnEl.textContent = '📝 文字起こし';
+      showPanel(true);                 // 既定で字幕を表示（音声なしでも読める。✕で閉じられる）
     } else {
       btnEl.textContent = '📝 文字起こし';   // 未生成：押すと生成
     }

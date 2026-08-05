@@ -69,6 +69,15 @@ export async function stopRecording(){
         setTimeout(()=>location.assign('/'), 100);  
       } else if( result.status !== 'error' ){
         await saveAnnotations(buildTimelinePayload());
+        // 字幕を裏で先に生成しておく（keepaliveで画面遷移後も継続）。開いた時には出来ている。
+        try {
+          fetch('transcribe.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'uuid=' + encodeURIComponent(appState.uuid),
+            keepalive: true,
+          });
+        } catch (e) { /* 失敗しても閲覧時に生成できる */ }
         const shareUrl = `https://pr.nkmr.io/${appState.uuid}`;
         await postReviewResult(shareUrl);   // LabPay校閲連携なら結果URLを書き戻す
         alert('チェック結果をサーバにアップロードしました。このURLを共有して下さい。');
