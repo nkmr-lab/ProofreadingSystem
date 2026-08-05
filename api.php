@@ -58,6 +58,15 @@ function meta_dir() {
     return $d;
 }
 function owner_path($uuid) { return meta_dir() . $uuid . '.json'; }
+// メタ書き込み：一時ファイル→rename（meta/ は777なので所有者が違っても置換できる）。
+// CLI(nakamura)とWeb(apache)が混在してもお互いのファイルを上書きできるようにする。
+function meta_put($path, $content) {
+    $tmp = $path . '.tmp' . getmypid();
+    if (@file_put_contents($tmp, $content, LOCK_EX) === false) return false;
+    if (@rename($tmp, $path)) return true;
+    @unlink($tmp);
+    return false;
+}
 function read_owner($uuid) {
     $p = owner_path($uuid);
     if (!is_file($p)) return null;
@@ -65,12 +74,12 @@ function read_owner($uuid) {
     return is_array($j) ? $j : null;
 }
 function write_owner($uuid, $me, $title = '') {
-    @file_put_contents(owner_path($uuid), json_encode([
+    meta_put(owner_path($uuid), json_encode([
         'email'   => $me['email'] ?? '',
         'name'    => $me['name'] ?? '',
         'title'   => $title,
         'created' => gmdate('c'),
-    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), LOCK_EX);
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
 }
 // 削除可否：ログイン中 && (自分が所有者 || 所有者未記録の旧データ)。
 function can_delete($uuid, $me) {
@@ -155,7 +164,7 @@ function update_owner_title($uuid, $title) {
     $o = is_file($p) ? json_decode(@file_get_contents($p), true) : null;
     if (!is_array($o)) $o = [];
     $o['title'] = $title;
-    @file_put_contents($p, json_encode($o, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), LOCK_EX);
+    meta_put($p, json_encode($o, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
 }
 
 // 1ページ目テキストから文書タイトルを抽出（失敗時は空文字）
@@ -260,7 +269,7 @@ if ($method === 'POST') {
             }
             $clean = array_values(array_unique($clean));
             $owner['recipients'] = $clean;
-            @file_put_contents(owner_path($uuid), json_encode($owner, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), LOCK_EX);
+            meta_put(owner_path($uuid), json_encode($owner, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
             echo json_encode(['status' => 'success', 'recipients' => $clean], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             exit;
         }

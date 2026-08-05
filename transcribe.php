@@ -179,7 +179,11 @@ if ($method === 'POST') {
     $raw = json_decode($resp, true);
     if (!is_array($raw)) j_err('APIレスポンスの解析に失敗', 502);
 
-    @file_put_contents($rawFile, json_encode($raw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
+    // 一時ファイル→rename（meta/は777, CLI/apacheの所有者混在でも置換可）
+    $tmp = $rawFile . '.tmp' . getmypid();
+    if (@file_put_contents($tmp, json_encode($raw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX) !== false) {
+        if (!@rename($tmp, $rawFile)) @unlink($tmp);
+    }
     respond_from_raw($raw, $me);
 }
 
