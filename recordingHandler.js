@@ -126,7 +126,8 @@ async function postReviewResult(resultUrl) {
   try {
     await fetch(rc.cb, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // LabPay は状態変更POSTに X-Requested-With: labpay(CSRF対策)を要求する。
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'labpay' },
       body: JSON.stringify({ cbt: rc.cbt, resultUrl }),
     });
   } catch (e) {
