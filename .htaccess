@@ -1,3 +1,9 @@
 RewriteEngine On
 RewriteBase /
 RewriteRule ^([A-Za-z0-9-]+)$ /?uuid=$1 [L,QSA]
+
+# JS/CSS は毎回サーバへ再検証（変更が無ければ304で軽い）。頻繁な差し替え後に
+# 古いモジュールがキャッシュされて「直したのに反映されない」を防ぐ。
+<FilesMatch "\.(js|css)$">
+  Header set Cache-Control "no-cache, must-revalidate"
+</FilesMatch>

@@ -27,6 +27,20 @@ const pdfSVG = document.getElementById('pdfSVG');
 export function getUploadedPDFFile(){ return uploaded_files; }
 export function setUploadedPDFFile(file){ uploaded_files = file; }
 
+// 1ページ目のテキストを抽出（タイトル推定用）。失敗しても空文字で返す。
+export async function getFirstPageText(maxChars = 2000){
+  if (!pdfDoc) return '';
+  try {
+    const page = await pdfDoc.getPage(1);
+    const tc = await page.getTextContent();
+    const s = tc.items.map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
+    return s.slice(0, maxChars);
+  } catch (e) {
+    console.warn('getFirstPageText failed', e);
+    return '';
+  }
+}
+
 // ---- double-buffer layer state ----
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const XLINK_NS = 'http://www.w3.org/1999/xlink';

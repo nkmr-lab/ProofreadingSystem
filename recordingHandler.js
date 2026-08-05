@@ -2,7 +2,7 @@ import { startTimeline, stopTimeline, buildTimelinePayload } from './timelineHan
 import { attachPointerDrawing } from './inputHandler.js';
 import { updateButtons } from './UIHandler.js';
 import { appState } from './appState.js';
-import { ensureUUID, ensureUUIDLocal } from './pdfHandler.js';
+import { ensureUUID, ensureUUIDLocal, getFirstPageText } from './pdfHandler.js';
 import { startMp4Recording, stopRecordingAndUpload, stopRecUI, stopRecordingLocalOnly } from './audioHandler.js';
 import { setHidden } from './htmlHandler.js';
 import { getPdfBlob, exportLocalRecordingAsZip, saveAnnotations } from './storageHandler.js';
@@ -26,6 +26,8 @@ export async function startRecordingOnServer(){
     startTimeline();
     resetView(true);   // 表示を全体に戻し、初期の表示範囲を記録
     updateButtons();
+
+    extractTitleAsync(newUuid);   // 論文タイトルを抽出（非同期・録音は待たせない）
   } catch (e) {
     console.error(e);
     alert(e.message || String(e));
@@ -90,6 +92,22 @@ export async function stopRecording(){
   appState.isCheckerMode = false;
   stopRecUI();
   updateButtons();
+}
+
+// 1ページ目テキストから論文タイトルを抽出し、所有者metaに保存（履歴表示用）。
+// 非同期・失敗しても録音や保存に影響しない。
+async function extractTitleAsync(uuid){
+  try {
+    const text = await getFirstPageText();
+    if (!text) return;
+    await fetch('api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'title', uuid, text }),
+    });
+  } catch (e) {
+    console.warn('title extract failed', e);
+  }
 }
 
 // LabPay の「校閲する」経由なら、保存した校閲URLを元のタスク添付へ返却する。

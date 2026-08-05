@@ -114,6 +114,58 @@ function list_my_reviews($filesDir, $me) {
     return $items;
 }
 
+// OpenAI キー（サーバのみの config.local.php）
+function read_openai_key() {
+    $cfg = __DIR__ . '/config.local.php';
+    if (is_file($cfg)) { $c = require $cfg; if (is_array($c)) return $c['openai_key'] ?? ''; }
+    return '';
+}
+
+// 所有者meta のタイトルだけ更新（他フィールドは温存）
+function update_owner_title($uuid, $title) {
+    $p = owner_path($uuid);
+    $o = is_file($p) ? json_decode(@file_get_contents($p), true) : null;
+    if (!is_array($o)) $o = [];
+    $o['title'] = $title;
+    @file_put_contents($p, json_encode($o, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), LOCK_EX);
+}
+
+// 1ページ目テキストから文書タイトルを抽出（失敗時は空文字）
+function openai_extract_title($text) {
+    $text = trim((string)$text);
+    if ($text === '') return '';
+    $key = read_openai_key();
+    if ($key === '') return '';
+
+    $payload = [
+        'model'       => 'gpt-4o-mini',
+        'temperature' => 0,
+        'max_tokens'  => 80,
+        'messages'    => [
+            ['role' => 'system', 'content' => 'あなたは文書のメタデータ抽出器です。与えられた1ページ目のテキストから、その文書（論文・レポート等）のタイトルだけを1行で返してください。前置き・引用符・説明は不要。タイトルが判別できなければ空文字を返してください。'],
+            ['role' => 'user', 'content' => mb_substr($text, 0, 4000)],
+        ],
+    ];
+    $ch = curl_init('https://api.openai.com/v1/chat/completions');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $key, 'Content-Type: application/json'],
+        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 30,
+    ]);
+    $resp = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($resp === false || $code < 200 || $code >= 300) return '';
+
+    $d = json_decode($resp, true);
+    $t = $d['choices'][0]['message']['content'] ?? '';
+    $t = trim(preg_replace('/\s+/u', ' ', (string)$t));
+    $t = trim($t, "\"'「」 　");
+    return mb_substr($t, 0, 200);
+}
+
 function sniff_pdf($tmpPath) {
     $fh = fopen($tmpPath, 'rb');
     if (!$fh) return false;
@@ -162,6 +214,17 @@ if ($method === 'POST') {
             if (!can_delete($uuid, $me)) json_error('削除する権限がありません（作成者のみ削除できます）', 403);
             delete_uuid_files($targetDir, $uuid);
             echo json_encode(['status' => 'success']);
+            exit;
+        }
+
+        // ---- 1b) タイトル抽出（{action:'title', uuid, text}）----
+        if (($input['action'] ?? '') === 'title') {
+            $uuid = $input['uuid'] ?? '';
+            if (!is_valid_uuid($uuid)) json_error('Invalid uuid');
+            if (!can_delete($uuid, $me)) json_error('権限がありません', 403);   // 作成者のみ
+            $title = openai_extract_title($input['text'] ?? '');
+            if ($title !== '') update_owner_title($uuid, $title);
+            echo json_encode(['status' => 'success', 'title' => $title], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             exit;
         }
 
