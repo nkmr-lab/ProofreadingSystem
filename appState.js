@@ -1,6 +1,7 @@
 export const appState = {
     isCheckerMode: false,
     isRecording: false,
+    isPaused: false,        // 録音一時停止中
     isRendering: false,
     isDrawing: false,
     recordTarget: null,

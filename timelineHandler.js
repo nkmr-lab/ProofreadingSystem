@@ -9,6 +9,10 @@ let recording = false;
 let events = [];   // {t, type, page, ...}
 let baseTs = null; // 録音開始の絶対時刻（Date.now）
 
+// 一時停止の累積。録音時計から差し引き、音声(pause中は記録されない)とタイミングを一致させる。
+let pausedAccumMs = 0;
+let pauseStartedAt = null;
+
 // 再生中にログが増える事故防止
 let suppressLogging = false;
 
@@ -20,13 +24,26 @@ let timerId = null;
 
 function nowMsFromStart() {
   if (!t0Perf) return 0;
-  return Math.max(0, Math.round(performance.now() - t0Perf));
+  const paused = pausedAccumMs + (pauseStartedAt != null ? performance.now() - pauseStartedAt : 0);
+  return Math.max(0, Math.round(performance.now() - t0Perf - paused));
 }
+
+// 録音の一時停止/再開。録音経過(音声・タイムライン)を止める。
+export function pauseTimeline() {
+  if (pauseStartedAt == null) pauseStartedAt = performance.now();
+}
+export function resumeTimeline() {
+  if (pauseStartedAt != null) { pausedAccumMs += performance.now() - pauseStartedAt; pauseStartedAt = null; }
+}
+// 現在の録音経過ms(一時停止分を除く)。録音タイマー表示にも使う。
+export function getRecordingMs() { return nowMsFromStart(); }
 
 export function startTimeline() {
   baseTs = Date.now();
   t0Perf = performance.now();
   recording = true;
+  pausedAccumMs = 0;
+  pauseStartedAt = null;
 
   events = [
     { t: 0, type: 'start', page: appState.currentPageNum, baseTs }

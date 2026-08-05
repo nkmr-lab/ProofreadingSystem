@@ -1,6 +1,10 @@
-import { attachAudioSync } from './timelineHandler.js';
+import { attachAudioSync, getRecordingMs } from './timelineHandler.js';
 import { appState } from './appState.js';
 import { dbg } from './debugOverlay.js';
+
+// 録音の一時停止/再開（音声）。タイムライン側は recordingHandler が pause/resumeTimeline を呼ぶ。
+export function pauseMic(){ try { if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.pause(); } catch (e) {} }
+export function resumeMic(){ try { if (mediaRecorder && mediaRecorder.state === 'paused') mediaRecorder.resume(); } catch (e) {} }
 
 function pickMimeType(){
   const candidates = [
@@ -303,7 +307,8 @@ export function startRecUI(stream, onAutoStop){
 
   clearInterval(recTimerId);
   recTimerId = setInterval(() => {
-    const elapsed = Date.now() - recStartMs;
+    // 録音経過は一時停止分を除いた値（タイムライン時計と一致）。開始直後は0。
+    const elapsed = getRecordingMs() || (Date.now() - recStartMs);
     t.textContent = fmtMs(elapsed);
 
     if (elapsed >= REC_MAX_MS) {

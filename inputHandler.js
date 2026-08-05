@@ -117,6 +117,7 @@ export function attachPointerDrawing(_pdfSVG){
 
   const onDown = (e) => {
     if (!appState.isCheckerMode) return;
+    if (appState.isPaused) return;            // 一時停止中は描かない
     if (appState.gesturing) return;           // 2本指ピンチ/パン中は描かない
     if (!isAllowedPointer(e)) return;
 

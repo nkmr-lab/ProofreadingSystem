@@ -6,7 +6,7 @@ import { bindInputModeUI, syncStateFromCheckboxes, loadInputSettings, keydownEve
          bindTouchModeUI, loadTouchMode, initDeviceInputUI } from './inputHandler.js';
 import { appState } from './appState.js';
 import { loadDataFromServer, importZipFile, deleteReviewFromServer } from './storageHandler.js';
-import { startRecordingOnServer, startRecordingOnLocal, stopRecording } from './recordingHandler.js';
+import { startRecordingOnServer, startRecordingOnLocal, stopRecording, togglePauseRecording } from './recordingHandler.js';
 import { initViewport, attachViewportGestures } from './viewportHandler.js';
 import { loadSkipSetting, bindSkipSilenceUI } from './silenceHandler.js';
 import { initTranscriptUI } from './transcriptHandler.js';
@@ -14,6 +14,12 @@ import { loadMyHistory } from './historyHandler.js';
 import { openShareDialog } from './shareHandler.js';
 
 document.addEventListener('keydown', (event) => keydownEvent(event));
+
+// iOS Safari は user-scalable=no を無視するので、ページ全体のピンチズーム(gesture*)を明示的に抑止。
+// アプリのPDF拡大はpointerイベント(viewportHandler)で行うため影響なし。
+for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) {
+  document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+}
 document.getElementById('next-page').addEventListener('click', () => changePage(1));
 document.getElementById('prev-page').addEventListener('click', () => changePage(-1));
 document.getElementById('undo').addEventListener('click', undoLast);
@@ -23,6 +29,7 @@ document.getElementById('importZipInput')?.addEventListener('change', importZipF
 document.getElementById('recordServer')?.addEventListener('click', startRecordingOnServer);
 document.getElementById('recordLocal')?.addEventListener('click', startRecordingOnLocal);
 document.getElementById('recordStop')?.addEventListener('click', stopRecording);
+document.getElementById('recordPause')?.addEventListener('click', togglePauseRecording);
 document.getElementById('deleteReview')?.addEventListener('click', () => deleteReviewFromServer(appState.uuid));
 document.getElementById('shareReview')?.addEventListener('click', openShareDialog);
 

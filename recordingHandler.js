@@ -1,9 +1,9 @@
-import { startTimeline, stopTimeline, buildTimelinePayload } from './timelineHandler.js';
+import { startTimeline, stopTimeline, buildTimelinePayload, pauseTimeline, resumeTimeline } from './timelineHandler.js';
 import { attachPointerDrawing } from './inputHandler.js';
 import { updateButtons } from './UIHandler.js';
 import { appState } from './appState.js';
 import { ensureUUID, ensureUUIDLocal, getFirstPageText } from './pdfHandler.js';
-import { startMp4Recording, stopRecordingAndUpload, stopRecUI, stopRecordingLocalOnly } from './audioHandler.js';
+import { startMp4Recording, stopRecordingAndUpload, stopRecUI, stopRecordingLocalOnly, pauseMic, resumeMic } from './audioHandler.js';
 import { setHidden } from './htmlHandler.js';
 import { getPdfBlob, exportLocalRecordingAsZip, saveAnnotations } from './storageHandler.js';
 import { DrawingMode } from './drawingHandler.js';
@@ -58,6 +58,26 @@ export async function startRecordingOnLocal(){
   updateButtons();
 }
 
+// 録音の一時停止/再開。音声(MediaRecorder)とタイムライン時計の両方を止める。
+export function togglePauseRecording(){
+  if (!appState.isRecording) return;
+  if (!appState.isPaused){
+    appState.isPaused = true;
+    pauseMic();
+    pauseTimeline();
+  } else {
+    appState.isPaused = false;
+    resumeMic();
+    resumeTimeline();
+  }
+  const btn = document.getElementById('recordPause');
+  if (btn) btn.textContent = appState.isPaused ? '▶ 再開' : '⏸ 一時停止';
+  const ind = document.getElementById('recIndicator');
+  if (ind) ind.classList.toggle('is-paused', appState.isPaused);
+  const t = document.getElementById('recTimer');
+  if (t) t.classList.toggle('is-paused', appState.isPaused);
+}
+
 export async function stopRecording(){
   try {
     if (appState.recordTarget === 'server') {
@@ -99,6 +119,9 @@ export async function stopRecording(){
   stopTimeline();
   appState.recordTarget = null;
   appState.isCheckerMode = false;
+  appState.isPaused = false;
+  const pbtn = document.getElementById('recordPause');
+  if (pbtn) pbtn.textContent = '⏸ 一時停止';
   stopRecUI();
   updateButtons();
 }

@@ -17,6 +17,7 @@ export function updateButtons() {
         setHidden('recordServer', true);
         setHidden('recordLocal', true);
         setHidden('recordStop', true);
+        setHidden('recordPause', true);
         setHidden('inputModeBox', true);
         setHidden('touchModeBox', true);
         setHidden('recIndicator', true);
@@ -59,6 +60,8 @@ export function updateButtons() {
                 setDisabled('recordLocal', true);
                 setHidden('recordStop', false);
                 setDisabled('recordStop', false);
+                setHidden('recordPause', false);
+                setDisabled('recordPause', false);
                 setHidden('recIndicator', false);
                 setDisabled('drawing-mode', false);
                 setHidden('homeButton', true);
@@ -68,6 +71,7 @@ export function updateButtons() {
                 setDisabled('drawing-mode', true);
                 setDisabled('undo', true);
                 setHidden('recordStop', true);
+                setHidden('recordPause', true);
                 setHidden('recIndicator', true);
             }
         } else {
@@ -80,6 +84,7 @@ export function updateButtons() {
             setHidden('recordLocal', true);
             setHidden('recIndicator', true);
             setHidden('recordStop', true);
+            setHidden('recordPause', true);
             setHidden('prev-page', true);
             setHidden('next-page', true);
             setHidden('drawing-mode', true);

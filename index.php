@@ -11,7 +11,9 @@ $logoutUrl = nkmrauth_logout_url();
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0">
+    <!-- ネイティブのページズーム(2本指)を無効化。PDF拡大はアプリ側(SVG変形)で行うので
+         ページ全体がズームしてツールバーが画面外へ飛ぶ事故を防ぐ。 -->
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PDF Checker</title>
 
     <link rel="stylesheet" href="styles.css">
@@ -75,6 +77,7 @@ $logoutUrl = nkmrauth_logout_url();
 
 <button id="recordLocal" class="btn btn--success" disabled>● ローカル録音</button>
 <button id="recordServer" class="btn btn--record" disabled>● サーバー録音</button>
+<button id="recordPause" class="btn btn--neutral" disabled>⏸ 一時停止</button>
 <button id="recordStop" class="btn btn--danger" disabled>■ 録音終了</button>
 
 <?php if ($me): ?>

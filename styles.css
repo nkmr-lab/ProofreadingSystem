@@ -181,6 +181,10 @@ body.is-phone #inputModeBox{ display:none !important; }
   color:var(--ink);
   margin-left:4px;
 }
+/* 一時停止中の表示 */
+.recIndicator.is-paused{ animation:none !important; opacity:.5; }
+.recIndicator.is-paused::after{ content:"⏸ 一時停止中"; color:var(--muted); font-weight:700; margin-left:6px; white-space:nowrap; }
+.recTimer.is-paused{ color:var(--muted); }
 
 /* ===== PDF 表示領域 ===== */
 #pdf-container{
