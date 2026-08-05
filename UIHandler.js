@@ -9,6 +9,7 @@ export function updateButtons() {
         setHidden('speedButtons', false);
         setHidden('audioPlayer', false);
         setHidden('skipSilence', false);   // 無音スキップは閲覧時のみ
+        setHidden('shareReview', false);   // 共有ボタンは閲覧時のみ
         setHidden('prev-page', true);
         setHidden('next-page', true);
         setHidden('drawing-mode', true);
