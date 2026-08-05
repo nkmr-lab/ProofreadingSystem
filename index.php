@@ -111,6 +111,10 @@ $logoutUrl = nkmrauth_logout_url();
 </div>
 
 <?php if ($me): // 自分のチェック履歴（ログイン時のみ） ?>
+<div id="sharedBox" style="display:none;">
+  <h2>🤝 あなたに共有された校正</h2>
+  <div id="sharedList"></div>
+</div>
 <div id="historyBox" style="display:none;">
   <h2>📋 あなたのチェック履歴</h2>
   <div id="historyList"></div>

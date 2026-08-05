@@ -114,6 +114,34 @@ function list_my_reviews($filesDir, $me) {
     return $items;
 }
 
+// 現在のユーザーに共有された（recipients に含まれる）校正の一覧。自分所有は除外。
+function list_shared_reviews($filesDir, $me) {
+    $meUser  = $me['user'] ?? '';
+    $meEmail = strtolower(trim($me['email'] ?? ''));
+    if ($meUser === '') return [];
+    $items = [];
+    $metaDir = meta_dir();
+    foreach (@scandir($metaDir) ?: [] as $fn) {
+        if (!preg_match('/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.json$/i', $fn, $m)) continue;
+        $o = json_decode(@file_get_contents($metaDir . $fn), true);
+        if (!is_array($o)) continue;
+        $recips = is_array($o['recipients'] ?? null) ? $o['recipients'] : [];
+        if (!in_array($meUser, $recips, true)) continue;
+        if (strtolower(trim($o['email'] ?? '')) === $meEmail) continue;   // 自分所有は items 側
+        $u = $m[1];
+        if (!is_file($filesDir . $u . '.pdf')) continue;
+        $items[] = [
+            'uuid'    => $u,
+            'title'   => $o['title'] ?? '',
+            'created' => $o['created'] ?? '',
+            'owner'   => $o['name'] ?? '',
+            'hasAudio'=> is_file($filesDir . $u . '.m4a'),
+        ];
+    }
+    usort($items, fn($a, $b) => strcmp($b['created'], $a['created']));
+    return $items;
+}
+
 // OpenAI キー（サーバのみの config.local.php）
 function read_openai_key() {
     $cfg = __DIR__ . '/config.local.php';
@@ -346,7 +374,11 @@ if ($method === 'POST') {
 // ---- GET: 自分の履歴一覧（ログイン必須）----
 if ($method === 'GET' && ($_GET['action'] ?? '') === 'mine') {
     $me = require_login();
-    echo json_encode(['status' => 'success', 'items' => list_my_reviews($targetDir, $me)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    echo json_encode([
+        'status' => 'success',
+        'items'  => list_my_reviews($targetDir, $me),      // 自分が作った
+        'shared' => list_shared_reviews($targetDir, $me),  // 自分に共有された
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
