@@ -11,6 +11,7 @@ import { initViewport, attachViewportGestures } from './viewportHandler.js';
 import { loadSkipSetting, bindSkipSilenceUI } from './silenceHandler.js';
 import { initTranscriptUI } from './transcriptHandler.js';
 import { loadMyHistory } from './historyHandler.js';
+import { openShareDialog } from './shareHandler.js';
 
 document.addEventListener('keydown', (event) => keydownEvent(event));
 document.getElementById('next-page').addEventListener('click', () => changePage(1));
@@ -23,29 +24,7 @@ document.getElementById('recordServer')?.addEventListener('click', startRecordin
 document.getElementById('recordLocal')?.addEventListener('click', startRecordingOnLocal);
 document.getElementById('recordStop')?.addEventListener('click', stopRecording);
 document.getElementById('deleteReview')?.addEventListener('click', () => deleteReviewFromServer(appState.uuid));
-document.getElementById('shareReview')?.addEventListener('click', shareReviewLink);
-
-// 校正結果の共有：この閲覧URL(pr.nkmr.io/{uuid})を渡すだけで相手はログイン不要で見られる。
-// スマホはネイティブ共有シート、PCはクリップボードへコピー。
-async function shareReviewLink(){
-  const uuid = appState.uuid;
-  if (!uuid) return;
-  const url = location.origin + '/' + uuid;
-  try {
-    if (navigator.share) {
-      await navigator.share({ title: '校正結果', text: '校正結果を共有します', url });
-      return;
-    }
-  } catch (e) {
-    if (e && e.name === 'AbortError') return;   // ユーザーがシートを閉じただけ
-  }
-  try {
-    await navigator.clipboard.writeText(url);
-    alert('共有リンクをコピーしました:\n' + url);
-  } catch {
-    window.prompt('このURLをコピーして共有してください', url);
-  }
-}
+document.getElementById('shareReview')?.addEventListener('click', openShareDialog);
 
 // nkmr SSO ログイン状態。サーバー録音はログイン時のみ有効。
 appState.loggedIn = document.getElementById('bodyContent')?.dataset?.loggedin === '1';

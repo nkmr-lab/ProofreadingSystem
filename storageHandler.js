@@ -13,9 +13,15 @@ export async function loadDataFromServer(_uuid){
   .then((response) => response.json())
   .then(async (data) => {
       if (data.status === 'error') {
-          alert('Failed to load PDF: ' + data.message);
+          // 限定公開で権限が無い等は、そのままメッセージを見せてトップへ誘導
+          alert(data.message || '読み込みに失敗しました');
+          location.assign('/');
           return;
       }
+
+      // 作成者フラグ・共有相手（共有ダイアログ用）
+      appState.isOwner = !!data.isOwner;
+      appState.recipients = Array.isArray(data.recipients) ? data.recipients : [];
 
       loadPDF(data.pdf);
       await setAudioSourceOrFallback(data.audio);

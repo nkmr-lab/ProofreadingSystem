@@ -94,6 +94,15 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $uuid = $_GET['uuid'] ?? ($_POST['uuid'] ?? '');
 if (!is_valid_uuid($uuid)) j_err('Invalid uuid');
 
+// recipients 制限を尊重（限定公開なら本人＋指定相手のみ文字起こし可）
+$ownerFile = $metaDir . $uuid . '.json';
+$owner = is_file($ownerFile) ? json_decode(@file_get_contents($ownerFile), true) : null;
+$recips = (is_array($owner) && is_array($owner['recipients'] ?? null)) ? $owner['recipients'] : [];
+if (!empty($recips)) {
+    $isOwner = strtolower(trim($me['email'] ?? '')) === strtolower(trim($owner['email'] ?? '')) && ($owner['email'] ?? '') !== '';
+    if (!$isOwner && !in_array($me['user'] ?? '', $recips, true)) j_err('閲覧権限がありません', 403);
+}
+
 $rawFile = $metaDir . $uuid . '.whisper.json';   // 生API応答のキャッシュ
 
 // ---- GET: 既存があれば間引いて返す ----

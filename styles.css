@@ -267,6 +267,39 @@ body.is-phone #inputModeBox{ display:none !important; }
 .hidden-file-input{ display:none; }
 .hidden{ display:none; }
 
+/* ===== 共有ダイアログ ===== */
+.share-backdrop{
+  position:fixed; inset:0; z-index:100;
+  background:rgba(16,24,40,.45);
+  display:flex; align-items:center; justify-content:center;
+  padding:16px;
+}
+.share-modal{
+  width:100%; max-width:460px; max-height:86vh; overflow-y:auto;
+  background:var(--surface); border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-md); padding:18px 20px;
+}
+.share-head{ display:flex; align-items:center; justify-content:space-between; font-size:16px; font-weight:700; margin-bottom:14px; }
+.share-link{ display:flex; gap:8px; }
+.share-link input{
+  flex:1; height:32px; padding:0 10px; font-size:13px;
+  border:1px solid var(--border-strong); border-radius:var(--radius); background:#f7f8fa; color:var(--ink);
+}
+.share-access{ margin-top:18px; border-top:1px solid var(--border); padding-top:14px; }
+.share-label{ font-size:13px; font-weight:600; color:var(--muted); margin-bottom:8px; }
+.share-opt{ display:flex; align-items:center; gap:8px; font-size:14px; padding:5px 0; cursor:pointer; }
+.share-members{
+  margin:10px 0 4px; padding:8px; border:1px solid var(--border); border-radius:var(--radius);
+  max-height:38vh; overflow-y:auto; background:#fbfcfd;
+}
+.share-loading{ color:var(--muted); font-size:13px; padding:8px; }
+.share-grade{ font-size:12px; font-weight:700; color:var(--accent); margin:8px 4px 4px; }
+.share-grade-list{ display:grid; grid-template-columns:1fr 1fr; gap:2px 10px; }
+.share-member{ display:flex; align-items:center; gap:6px; font-size:13px; padding:4px 6px; border-radius:6px; cursor:pointer; }
+.share-member:hover{ background:#eef2ff; }
+.share-foot{ display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-top:12px; }
+.share-status{ font-size:12px; color:var(--muted); margin-right:auto; }
+
 /* ===== チェック履歴 ===== */
 #historyBox{
   max-width:640px;

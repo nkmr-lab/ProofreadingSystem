@@ -217,6 +217,26 @@ if ($method === 'POST') {
             exit;
         }
 
+        // ---- 1c) 共有相手の設定（{action:'recipients', uuid, recipients:[username]}）----
+        if (($input['action'] ?? '') === 'recipients') {
+            $uuid = $input['uuid'] ?? '';
+            if (!is_valid_uuid($uuid)) json_error('Invalid uuid');
+            $owner = read_owner($uuid);
+            $amOwner = is_array($owner) && strtolower(trim($me['email'] ?? '')) === strtolower(trim($owner['email'] ?? '')) && ($owner['email'] ?? '') !== '';
+            if (!$amOwner) json_error('作成者のみ設定できます', 403);
+
+            $clean = [];
+            foreach ((array)($input['recipients'] ?? []) as $r) {
+                $r = trim((string)$r);
+                if ($r !== '' && preg_match('/^[A-Za-z0-9_.-]{1,64}$/', $r)) $clean[] = $r;
+            }
+            $clean = array_values(array_unique($clean));
+            $owner['recipients'] = $clean;
+            @file_put_contents(owner_path($uuid), json_encode($owner, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), LOCK_EX);
+            echo json_encode(['status' => 'success', 'recipients' => $clean], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
         // ---- 1b) タイトル抽出（{action:'title', uuid, text}）----
         if (($input['action'] ?? '') === 'title') {
             $uuid = $input['uuid'] ?? '';
@@ -330,6 +350,24 @@ if ($method === 'GET' && ($_GET['action'] ?? '') === 'mine') {
     exit;
 }
 
+// ---- GET: 研究室メンバー一覧（共有相手ピッカー用）。CORS回避で auth へサーバ中継 ----
+if ($method === 'GET' && ($_GET['action'] ?? '') === 'roster') {
+    require_login();
+    $tok = $_COOKIE['NKMRID'] ?? '';
+    $ch = curl_init('https://auth.nkmr.io/?action=roster');
+    curl_setopt_array($ch, [
+        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $tok],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 6,
+    ]);
+    $r = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($r === false || $code < 200 || $code >= 300) json_error('メンバー一覧を取得できませんでした', 502);
+    echo $r;   // auth の JSON をそのまま返す
+    exit;
+}
+
 // ---- GET: uuid で取得 ----
 if ($method === 'GET' && isset($_GET['uuid'])) {
     $uuid = $_GET['uuid'];
@@ -340,6 +378,18 @@ if ($method === 'GET' && isset($_GET['uuid'])) {
     $audioFile = safe_path($targetDir, $uuid, 'm4a');
 
     if (file_exists($pdfFile) && file_exists($jsonFile)) {
+        // ---- アクセス制御：recipients 指定時は 本人＋指定相手のみ（空なら公開）----
+        $me = nkmrauth_identity();
+        $owner = read_owner($uuid);
+        $recipients = (is_array($owner) && is_array($owner['recipients'] ?? null)) ? $owner['recipients'] : [];
+        $isOwner = ($me && is_array($owner) && strtolower(trim($me['email'] ?? '')) === strtolower(trim($owner['email'] ?? '')) && ($owner['email'] ?? '') !== '');
+        if (!empty($recipients)) {
+            $allowed = $isOwner || ($me && in_array($me['user'] ?? '', $recipients, true));
+            if (!$allowed) {
+                json_error($me ? 'この校正の閲覧権限がありません（作成者が指定した人のみ閲覧できます）' : 'この校正は限定公開です。中村研アカウントでログインしてください。', 403);
+            }
+        }
+
         $jsonData = file_get_contents($jsonFile);
         if ($jsonData === false) json_error('Failed to read session', 500);
 
@@ -350,7 +400,9 @@ if ($method === 'GET' && isset($_GET['uuid'])) {
         if (file_exists($audioFile)) $resp['audio'] = 'files/' . $uuid . '.m4a';
 
         // ログイン中で、自分の校正（または所有者未記録の旧データ）なら削除可
-        $resp['canDelete'] = can_delete($uuid, nkmrauth_identity());
+        $resp['canDelete'] = can_delete($uuid, $me);
+        $resp['isOwner'] = (bool)$isOwner;
+        if ($isOwner) $resp['recipients'] = $recipients;   // 相手指定は作成者にだけ返す
 
         echo json_encode($resp, JSON_UNESCAPED_SLASHES);
         exit;
