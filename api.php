@@ -199,7 +199,9 @@ function openai_extract_title($text) {
     $d = json_decode($resp, true);
     $t = $d['choices'][0]['message']['content'] ?? '';
     $t = trim(preg_replace('/\s+/u', ' ', (string)$t));
-    $t = trim($t, "\"'「」 　");
+    // 前後の引用符・括弧・空白を除去。※ trim() はバイト単位なので全角文字を壊す
+    //   （例: 先頭「デ」E3 83 87 の E3 が剥がれ ??化）。Unicode 安全に preg_replace(/u) で。
+    $t = preg_replace('/^[\s"\'“”「」『』（）()　]+|[\s"\'“”「」『』（）()　]+$/u', '', $t);
     return mb_substr($t, 0, 200);
 }
 
