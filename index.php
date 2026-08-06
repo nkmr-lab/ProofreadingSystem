@@ -14,7 +14,7 @@ $logoutUrl = nkmrauth_logout_url();
     <!-- ネイティブのページズーム(2本指)を無効化。PDF拡大はアプリ側(SVG変形)で行うので
          ページ全体がズームしてツールバーが画面外へ飛ぶ事故を防ぐ。 -->
     <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PDF Checker</title>
+    <title>Proofreading System</title>
 
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.9.359/pdf.min.js"></script>
