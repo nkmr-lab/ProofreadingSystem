@@ -32,9 +32,10 @@ export async function openShareDialog(){
 
   const ownerSection = appState.isOwner ? `
     <div class="share-access">
-      <div class="share-label">閲覧できる人</div>
+      <div class="share-label">共有のしかた</div>
       <label class="share-opt"><input type="radio" name="vis" value="public"> リンクを知っている人みんな</label>
-      <label class="share-opt"><input type="radio" name="vis" value="restricted"> 指定した人だけ（中村研）</label>
+      <label class="share-opt"><input type="radio" name="vis" value="restricted"> 指定した人だけ（限定公開）</label>
+      <label class="share-opt"><input type="radio" name="vis" value="open"> 指定した人に届ける＋他の人も見られる</label>
       <div id="shareMembers" class="share-members"><div class="share-loading">読み込み中…</div></div>
       <div class="share-foot">
         <span id="shareStatus" class="share-status"></span>
@@ -81,9 +82,11 @@ async function copyOrShare(){
 }
 
 async function initOwnerControls(){
-  const restricted = appState.recipients.length > 0;
+  // 現在のモードを判定: 相手なし=public / 相手あり&restricted=restricted / 相手あり&公開=open
+  let mode = 'public';
+  if (appState.recipients.length > 0) mode = appState.restricted ? 'restricted' : 'open';
   for (const r of document.querySelectorAll('input[name="vis"]')){
-    r.checked = (r.value === (restricted ? 'restricted' : 'public'));
+    r.checked = (r.value === mode);
     r.addEventListener('change', reflectVis);
   }
   document.getElementById('shareSave').addEventListener('click', saveRecipients);
@@ -101,7 +104,8 @@ async function initOwnerControls(){
 function reflectVis(){
   const vis = document.querySelector('input[name="vis"]:checked')?.value;
   const m = document.getElementById('shareMembers');
-  if (m) m.style.display = (vis === 'restricted') ? '' : 'none';
+  // public 以外(相手を指定するモード)ではメンバー選択を出す
+  if (m) m.style.display = (vis === 'public') ? 'none' : '';
 }
 
 function renderMembers(users, selected){
@@ -127,9 +131,11 @@ function renderMembers(users, selected){
 async function saveRecipients(){
   const vis = document.querySelector('input[name="vis"]:checked')?.value;
   let recipients = [];
-  if (vis === 'restricted'){
+  let restricted = false;
+  if (vis !== 'public'){
     recipients = Array.from(document.querySelectorAll('#shareMembers input[type="checkbox"]:checked')).map(c => c.value);
     if (recipients.length === 0){ setStatus('相手を1人以上選んでください', true); return; }
+    restricted = (vis === 'restricted');   // open は公開のまま届ける
   }
   const btn = document.getElementById('shareSave');
   btn.disabled = true; setStatus('保存中…', false);
@@ -137,12 +143,17 @@ async function saveRecipients(){
     const res = await fetch('api.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'recipients', uuid: appState.uuid, recipients }),
+      body: JSON.stringify({ action: 'recipients', uuid: appState.uuid, recipients, restricted }),
     });
     const data = await res.json();
     if (data.status !== 'success') throw new Error(data.message || '保存に失敗しました');
     appState.recipients = data.recipients || [];
-    setStatus(appState.recipients.length ? `${appState.recipients.length}人に限定しました` : 'みんなに公開にしました', false);
+    appState.restricted = !!data.restricted;
+    let msg;
+    if (!appState.recipients.length) msg = 'みんなに公開にしました';
+    else if (appState.restricted) msg = `${appState.recipients.length}人だけに限定しました`;
+    else msg = `${appState.recipients.length}人に届けました（公開のまま）`;
+    setStatus(msg, false);
   } catch (e) {
     setStatus(e.message || String(e), true);
   } finally {

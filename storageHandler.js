@@ -19,9 +19,10 @@ export async function loadDataFromServer(_uuid){
           return;
       }
 
-      // 作成者フラグ・共有相手（共有ダイアログ用）
+      // 作成者フラグ・共有相手・公開設定（共有ダイアログ用）
       appState.isOwner = !!data.isOwner;
       appState.recipients = Array.isArray(data.recipients) ? data.recipients : [];
+      appState.restricted = (data.restricted !== undefined) ? !!data.restricted : (appState.recipients.length > 0);
 
       loadPDF(data.pdf);
       await setAudioSourceOrFallback(data.audio);

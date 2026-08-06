@@ -270,9 +270,12 @@ if ($method === 'POST') {
                 if ($r !== '' && preg_match('/^[A-Za-z0-9_.-]{1,64}$/', $r)) $clean[] = $r;
             }
             $clean = array_values(array_unique($clean));
+            $restricted = !empty($input['restricted']);
+            if (empty($clean)) $restricted = false;   // 相手指定なし＝公開
             $owner['recipients'] = $clean;
+            $owner['restricted'] = $restricted;
             meta_put(owner_path($uuid), json_encode($owner, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
-            echo json_encode(['status' => 'success', 'recipients' => $clean], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            echo json_encode(['status' => 'success', 'recipients' => $clean, 'restricted' => $restricted], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             exit;
         }
 
@@ -421,12 +424,16 @@ if ($method === 'GET' && isset($_GET['uuid'])) {
     $audioFile = safe_path($targetDir, $uuid, 'm4a');
 
     if (file_exists($pdfFile) && file_exists($jsonFile)) {
-        // ---- アクセス制御：recipients 指定時は 本人＋指定相手のみ（空なら公開）----
+        // ---- アクセス制御 ----
+        // recipients = 共有相手(ホーム「共有された」に出る)。restricted=true のときだけ閲覧を本人＋相手に限定。
+        // restricted=false なら「相手に届けるが、リンクを知っていれば誰でも閲覧可(公開)」。
+        // 旧データ(restrictedキー無し)は従来どおり recipients があれば限定扱い。
         $me = nkmrauth_identity();
         $owner = read_owner($uuid);
         $recipients = (is_array($owner) && is_array($owner['recipients'] ?? null)) ? $owner['recipients'] : [];
+        $restricted = (is_array($owner) && array_key_exists('restricted', $owner)) ? (bool)$owner['restricted'] : !empty($recipients);
         $isOwner = ($me && is_array($owner) && strtolower(trim($me['email'] ?? '')) === strtolower(trim($owner['email'] ?? '')) && ($owner['email'] ?? '') !== '');
-        if (!empty($recipients)) {
+        if (!empty($recipients) && $restricted) {
             $allowed = $isOwner || ($me && in_array($me['user'] ?? '', $recipients, true));
             if (!$allowed) {
                 json_error($me ? 'この校正の閲覧権限がありません（作成者が指定した人のみ閲覧できます）' : 'この校正は限定公開です。中村研アカウントでログインしてください。', 403);
@@ -445,7 +452,10 @@ if ($method === 'GET' && isset($_GET['uuid'])) {
         // ログイン中で、自分の校正（または所有者未記録の旧データ）なら削除可
         $resp['canDelete'] = can_delete($uuid, $me);
         $resp['isOwner'] = (bool)$isOwner;
-        if ($isOwner) $resp['recipients'] = $recipients;   // 相手指定は作成者にだけ返す
+        if ($isOwner) {                                    // 相手指定・公開設定は作成者にだけ返す
+            $resp['recipients'] = $recipients;
+            $resp['restricted'] = $restricted;
+        }
 
         echo json_encode($resp, JSON_UNESCAPED_SLASHES);
         exit;

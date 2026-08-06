@@ -16,5 +16,6 @@ export const appState = {
     reviewCb: null,     // LabPay校閲連携: {cb, cbt} 保存成功時に結果URLを返す
     uuid: null,
     isOwner: false,     // 閲覧中の校正の作成者本人か（共有相手の設定可否）
-    recipients: [],     // 限定公開の相手（username配列, 作成者にだけ届く）
+    recipients: [],     // 共有相手（username配列, 作成者にだけ届く）
+    restricted: true,   // true=相手だけ閲覧可 / false=相手に届けるが公開（誰でも閲覧可）
 };

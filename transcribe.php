@@ -98,7 +98,8 @@ if (!is_valid_uuid($uuid)) j_err('Invalid uuid');
 $ownerFile = $metaDir . $uuid . '.json';
 $owner = is_file($ownerFile) ? json_decode(@file_get_contents($ownerFile), true) : null;
 $recips = (is_array($owner) && is_array($owner['recipients'] ?? null)) ? $owner['recipients'] : [];
-if (!empty($recips)) {
+$restricted = (is_array($owner) && array_key_exists('restricted', $owner)) ? (bool)$owner['restricted'] : !empty($recips);
+if (!empty($recips) && $restricted) {
     $isOwner = strtolower(trim($me['email'] ?? '')) === strtolower(trim($owner['email'] ?? '')) && ($owner['email'] ?? '') !== '';
     if (!$isOwner && !in_array($me['user'] ?? '', $recips, true)) j_err('閲覧権限がありません', 403);
 }
