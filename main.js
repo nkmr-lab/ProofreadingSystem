@@ -33,6 +33,24 @@ document.getElementById('recordPause')?.addEventListener('click', togglePauseRec
 document.getElementById('deleteReview')?.addEventListener('click', () => deleteReviewFromServer(appState.uuid));
 document.getElementById('shareReview')?.addEventListener('click', openShareDialog);
 
+// ユーザーアイコン：タップでログアウトを出す小さなポップオーバー。外側タップで閉じる。
+const userAvatar = document.getElementById('userAvatar');
+const userPopover = document.getElementById('userPopover');
+if (userAvatar && userPopover) {
+  userAvatar.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const willShow = userPopover.hasAttribute('hidden');
+    userPopover.toggleAttribute('hidden', !willShow);
+    userAvatar.setAttribute('aria-expanded', willShow ? 'true' : 'false');
+  });
+  document.addEventListener('click', (e) => {
+    if (!userPopover.hasAttribute('hidden') && !userPopover.contains(e.target) && e.target !== userAvatar) {
+      userPopover.setAttribute('hidden', '');
+      userAvatar.setAttribute('aria-expanded', 'false');
+    }
+  });
+}
+
 // nkmr SSO ログイン状態。サーバー録音はログイン時のみ有効。
 appState.loggedIn = document.getElementById('bodyContent')?.dataset?.loggedin === '1';
 document.getElementById('loginServerBtn')?.addEventListener('click', (e) => {

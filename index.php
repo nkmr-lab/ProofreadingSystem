@@ -80,8 +80,17 @@ $logoutUrl = nkmrauth_logout_url();
 <button id="recordPause" class="btn btn--neutral" disabled>⏸ 一時停止</button>
 <button id="recordStop" class="btn btn--danger" disabled>■ 録音終了</button>
 
-<?php if ($me): ?>
-<span id="userBadge" class="user-badge">👤 <?php echo htmlspecialchars($me['name'] ?? $me['email'] ?? '', ENT_QUOTES); ?> <a href="<?php echo htmlspecialchars($logoutUrl, ENT_QUOTES); ?>">ログアウト</a></span>
+<?php if ($me):
+  $dispName = $me['name'] ?? $me['email'] ?? '';
+  $initial  = mb_substr($dispName, 0, 1);   // アイコンに出す頭文字（中村聡史→中）
+?>
+<div id="userMenu" class="user-menu">
+  <button id="userAvatar" class="user-avatar" title="<?php echo htmlspecialchars($dispName, ENT_QUOTES); ?>" aria-haspopup="true" aria-expanded="false"><?php echo htmlspecialchars($initial, ENT_QUOTES); ?></button>
+  <div id="userPopover" class="user-popover" hidden>
+    <div class="user-popover-name"><?php echo htmlspecialchars($dispName, ENT_QUOTES); ?></div>
+    <a class="user-popover-logout" href="<?php echo htmlspecialchars($logoutUrl, ENT_QUOTES); ?>">ログアウト</a>
+  </div>
+</div>
 <?php else: ?>
 <button id="loginServerBtn" class="btn btn--login" data-login="<?php echo htmlspecialchars($loginUrl, ENT_QUOTES); ?>" style="display:none;">🔑 中村研の人はログイン（サーバー保存）</button>
 <?php endif; ?>

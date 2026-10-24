@@ -132,20 +132,41 @@ button:focus-visible, .btn:focus-visible{ outline:2px solid var(--accent); outli
 body:not(.is-phone) #touchModeBox{ display:none !important; }
 body.is-phone #inputModeBox{ display:none !important; }
 
-/* ===== ユーザーバッジ ===== */
-.user-badge{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  margin-left:auto;
-  font-size:12px;
-  color:var(--muted);
-  background:#eef0f3;
-  padding:5px 10px 5px 8px;
-  border-radius:var(--radius-pill);
+/* ===== ユーザーアイコン（丸・タップでログアウト） ===== */
+.user-menu{ position:relative; margin-left:auto; }
+.user-avatar{
+  width:32px; height:32px; padding:0;
+  border-radius:50%;
+  border:none;
+  background:var(--accent); color:#fff;
+  font-size:14px; font-weight:700; line-height:1;
+  display:inline-flex; align-items:center; justify-content:center;
+  cursor:pointer;
 }
-.user-badge a{ color:var(--accent); text-decoration:none; }
-.user-badge a:hover{ text-decoration:underline; }
+.user-avatar:hover{ background:var(--accent-hover); }
+.user-popover{
+  position:absolute; right:0; top:40px;
+  min-width:150px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow-md);
+  padding:8px;
+  z-index:60;
+}
+.user-popover[hidden]{ display:none; }
+.user-popover-name{
+  font-size:13px; font-weight:600; color:var(--ink);
+  padding:4px 8px 8px; margin-bottom:4px;
+  border-bottom:1px solid var(--border);
+  white-space:nowrap;
+}
+.user-popover-logout{
+  display:block; padding:7px 8px;
+  font-size:13px; color:var(--danger); text-decoration:none;
+  border-radius:var(--radius);
+}
+.user-popover-logout:hover{ background:#fde8e8; }
 
 /* ===== 録音インジケータ ===== */
 .recIndicator{
