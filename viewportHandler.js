@@ -150,18 +150,25 @@ export function resetView(log = false, animate = false) {
 }
 
 // ===== ジェスチャ（2本指ピンチ/パン） =====
+const COMMIT_PX = 14;   // 2本指がこの距離(指間 or 中点)動いて初めてズーム/パンを確定
+
 export function attachViewportGestures(_svg) {
   if (!_svg || _svg.__vpAttached) return;
   _svg.__vpAttached = true;
 
+  // 2本指が乗ったが、まだ「本気のピンチ」と確定していない待機状態。
+  let armed = false, armD0 = 0, armMx = 0, armMy = 0;
+
   const onDown = (e) => {
     if (e.pointerType !== 'touch') return;
+    // iPadのペン筆記中(＋直後GRACE)のタッチは手のひら等の誤爆とみなし、ズーム/パンに使わない(palm rejection)。
+    if (performance.now() < (appState.penActiveUntil || 0)) return;
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pts.size === 2) {
-      // 2本目 → ピンチ開始。進行中の手書きは破棄。
-      appState.gesturing = true;
-      try { cancelDrawing(); } catch {}
-      startGesture();
+      // すぐには確定しない。基準(指間距離・中点)だけ取り、十分動いたら commit。
+      const [a, b] = twoPoints();
+      if (a && b) { armD0 = Math.hypot(a.x - b.x, a.y - b.y); armMx = (a.x + b.x) / 2; armMy = (a.y + b.y) / 2; }
+      armed = true;   // この時点では gesturing にせず cancelDrawing もしない
     }
   };
 
@@ -169,7 +176,24 @@ export function attachViewportGestures(_svg) {
     if (e.pointerType !== 'touch') return;
     if (!pts.has(e.pointerId)) return;
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (appState.gesturing && pts.size >= 2) {
+    if (pts.size < 2) return;
+
+    // 待機中：一定距離動いて初めて本気のピンチと確定（置いただけ・一瞬の接触は無視）。
+    if (armed && !appState.gesturing) {
+      const [a, b] = twoPoints();
+      if (!a || !b) return;
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      if (Math.abs(d - armD0) > COMMIT_PX || Math.hypot(mx - armMx, my - armMy) > COMMIT_PX) {
+        appState.gesturing = true;
+        try { cancelDrawing(); } catch {}
+        startGesture();   // 現在の2指で基準を取り直す（閾値分のジャンプ防止）
+      } else {
+        return;
+      }
+    }
+
+    if (appState.gesturing) {
       e.preventDefault();
       updateGesture();
       maybeLogView(false);
@@ -179,12 +203,15 @@ export function attachViewportGestures(_svg) {
   const onUp = (e) => {
     if (e.pointerType !== 'touch') return;
     pts.delete(e.pointerId);
-    if (pts.size < 2 && appState.gesturing) {
-      appState.gesturing = false;
-      gesture = null;
-      clampTranslate();
-      applyTransform(false);
-      maybeLogView(true); // 最終位置を確定記録
+    if (pts.size < 2) {
+      armed = false;
+      if (appState.gesturing) {
+        appState.gesturing = false;
+        gesture = null;
+        clampTranslate();
+        applyTransform(false);
+        maybeLogView(true); // 最終位置を確定記録
+      }
     }
   };
 

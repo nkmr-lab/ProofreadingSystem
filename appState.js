@@ -12,6 +12,7 @@ export const appState = {
     // PC/iPad では未使用（従来どおり指＝手書き）。
     touchMode: 'auto',
     gesturing: false,   // 2本指ピンチ/パン中は手書きを止める
+    penActiveUntil: 0,  // ペン(Apple Pencil)筆記中＋直後のタッチ無視(palm rejection)。performance.now()基準
     loggedIn: false,
     reviewCb: null,     // LabPay校閲連携: {cb, cbt} 保存成功時に結果URLを返す
     uuid: null,

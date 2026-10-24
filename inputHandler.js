@@ -9,6 +9,9 @@ import { panByScreen, commitPanLog } from './viewportHandler.js';
 const phoneMQ = window.matchMedia('(pointer: coarse) and (max-width: 640px)');
 export function isPhone(){ return phoneMQ.matches; }
 
+// ペン(Apple Pencil)筆記を検知したら、この時間だけタッチのズーム/パンを抑止(iPad palm rejection)。
+const PEN_GRACE_MS = 800;
+
 // おまかせ判定のパラメータ（画面px基準）
 const DECIDE_DIST = 18;     // この距離動いたら「手書き/移動」を確定する
 const CURVE_RATIO = 0.86;   // 直進度がこれ未満＝曲がっている→手書き（丸で囲む等）
@@ -116,6 +119,7 @@ export function attachPointerDrawing(_pdfSVG){
   };
 
   const onDown = (e) => {
+    if (e.pointerType === 'pen') appState.penActiveUntil = performance.now() + PEN_GRACE_MS;  // palm rejection用
     if (!appState.isCheckerMode) return;
     if (appState.isPaused) return;            // 一時停止中は描かない
     if (appState.gesturing) return;           // 2本指ピンチ/パン中は描かない
@@ -151,6 +155,7 @@ export function attachPointerDrawing(_pdfSVG){
   };
 
   const onMove = (e) => {
+    if (e.pointerType === 'pen') appState.penActiveUntil = performance.now() + PEN_GRACE_MS;  // palm rejection用
     if (!appState.isCheckerMode) return;
 
     // スマホ move/auto 中
