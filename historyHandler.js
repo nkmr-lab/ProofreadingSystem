@@ -26,12 +26,33 @@ function makeRow(it){
   return a;
 }
 
+const VISIBLE = 2;   // これ以下は全部表示。3件以上は最初の2件＋「もっと見る」で畳む。
+
 function fillList(listId, boxId, items){
   const list = document.getElementById(listId);
   const box = document.getElementById(boxId);
   if (!list || !box || !items || !items.length) return;
   list.innerHTML = '';
-  for (const it of items) list.appendChild(makeRow(it));
+  const rows = items.map(makeRow);
+  rows.forEach(r => list.appendChild(r));
+
+  if (items.length > VISIBLE){
+    const hiddenRows = rows.slice(VISIBLE);
+    hiddenRows.forEach(r => { r.hidden = true; });
+    const n = items.length - VISIBLE;
+    let expanded = false;
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'hist-more';
+    const setLabel = () => { toggle.textContent = expanded ? '畳む ▲' : `もっと見る（残り${n}件）▼`; };
+    setLabel();
+    toggle.addEventListener('click', () => {
+      expanded = !expanded;
+      hiddenRows.forEach(r => { r.hidden = !expanded; });
+      setLabel();
+    });
+    list.appendChild(toggle);
+  }
   box.style.display = '';
 }
 

@@ -357,6 +357,14 @@ body.is-phone #inputModeBox{ display:none !important; }
 .hist-row:hover{ transform:translateY(-1px); box-shadow:var(--shadow-sm); border-color:var(--accent); background:#eef2ff; }
 .hist-title{ font-weight:600; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .hist-meta{ flex:0 0 auto; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
+.hist-more{
+  align-self:center;
+  margin-top:4px;
+  background:none; border:none;
+  color:var(--accent); font-size:13px; font-weight:600;
+  cursor:pointer; padding:6px 10px;
+}
+.hist-more:hover{ text-decoration:underline; }
 
 /* ===== 使い方カード ===== */
 #description{
