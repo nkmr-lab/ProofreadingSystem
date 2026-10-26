@@ -92,6 +92,7 @@ export function updateButtons() {
             setHidden('recIndicator', true);
             setHidden('recordStop', true);
             setHidden('recordPause', true);
+            setHidden('loginServerBtn', appState.loggedIn);   // 未ログインならホームでもログイン入口を出す
             setHidden('prev-page', true);
             setHidden('next-page', true);
             setHidden('drawing-mode', true);
