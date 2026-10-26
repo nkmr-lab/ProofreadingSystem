@@ -61,6 +61,7 @@ export function updateButtons() {
             setDisabled('next-page', appState.currentPageNum >= pdfDoc.numPages);
             setHidden('zipControls', true);
             if( appState.isRecording ){
+                setHidden('reqBanner', true);   // 録音開始したら依頼バナーを隠す（邪魔・誤タップ防止）
                 if( appState.recordTarget === 'server') setHidden('recordLocal', true);
                 if( appState.recordTarget === 'local') setHidden('recordServer', true);
                 setDisabled('recordServer', true);
