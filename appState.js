@@ -2,6 +2,7 @@ export const appState = {
     isCheckerMode: false,
     isRecording: false,
     isPaused: false,        // 録音一時停止中
+    isBusy: false,          // 録音開始/終了の処理中（ボタン二度押し防止）
     isRendering: false,
     isDrawing: false,
     recordTarget: null,

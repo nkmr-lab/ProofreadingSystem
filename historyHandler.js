@@ -14,26 +14,58 @@ function fmtDate(iso){
 }
 
 // 1件分の行DOMを作る。owner を渡すと「共有された」一覧用に共有者名も出す。
-function makeRow(it){
+// deletable=true のときは行末に🗑を出し、その場で削除できる（自分のチェック履歴のみ）。
+function makeRow(it, deletable = false){
+  const row = document.createElement('div');
+  row.className = 'hist-row';
   const a = document.createElement('a');
-  a.className = 'hist-row';
+  a.className = 'hist-link';
   a.href = '/' + it.uuid;
   const title = it.title && it.title.trim() ? it.title : '(無題のPDF)';
   const who = it.owner ? `${escapeHtml(it.owner)}・` : '';
   a.innerHTML =
     `<span class="hist-title">${escapeHtml(title)}</span>` +
     `<span class="hist-meta">${it.hasAudio ? '🎙️ ' : ''}${who}${escapeHtml(fmtDate(it.created))}</span>`;
-  return a;
+  row.appendChild(a);
+  if (deletable){
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'hist-del';
+    del.title = '削除';
+    del.setAttribute('aria-label', '削除');
+    del.textContent = '🗑';
+    del.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!confirm(`「${title}」を削除します。元に戻せません。よろしいですか？`)) return;
+      del.disabled = true;
+      try {
+        const r = await fetch('api.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete', uuid: it.uuid }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok || d.status !== 'success') throw new Error(d.message || `削除に失敗しました (${r.status})`);
+        row.remove();
+      } catch (err) {
+        del.disabled = false;
+        alert(err.message || '削除に失敗しました');
+      }
+    });
+    row.appendChild(del);
+  }
+  return row;
 }
 
 const VISIBLE = 2;   // 既定：これ以下は全部表示。超えたら先頭だけ出して「もっと見る」で畳む。
 
-function fillList(listId, boxId, items, visible = VISIBLE){
+function fillList(listId, boxId, items, visible = VISIBLE, deletable = false){
   const list = document.getElementById(listId);
   const box = document.getElementById(boxId);
   if (!list || !box || !items || !items.length) return;
   list.innerHTML = '';
-  const rows = items.map(makeRow);
+  const rows = items.map(it => makeRow(it, deletable));
   rows.forEach(r => list.appendChild(r));
 
   if (items.length > visible){
@@ -66,7 +98,7 @@ export async function loadMyHistory(){
     renderRequestsIn(data.requests_in || []);                 // 自分に来た依頼(未対応)
     renderRequestsOut(data.requests_out || []);               // 自分が出した依頼
     fillList('sharedList', 'sharedBox', data.shared || []);       // 自分に共有された(既定2件)
-    fillList('historyList', 'historyBox', data.items || [], 5);   // 自分のチェック履歴は直近5件＋もっと見る
+    fillList('historyList', 'historyBox', data.items || [], 5, true);   // 自分のチェック履歴は直近5件＋もっと見る（🗑で削除可）
   } catch (e) {
     console.warn('履歴の取得に失敗:', e);
   }

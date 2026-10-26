@@ -86,6 +86,17 @@ button:focus-visible, .btn:focus-visible{ outline:2px solid var(--accent); outli
 .btn--success:hover:not(:disabled){ background:var(--success-hover); }
 .btn--record{ background:var(--accent); border-color:var(--accent); color:#fff; }
 .btn--record:hover:not(:disabled){ background:var(--accent-hover); }
+/* 依頼を開いて録音待ちのとき、サーバー録音ボタンをチカチカさせて「ここを押して」と知らせる。
+   押せる状態は保ったまま（visibilityは触らない）、リングと明滅で注意を引く。 */
+.btn--record.blink{ animation: recPulse 1.25s ease-out infinite; }
+@keyframes recPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(79,70,229,.55); opacity:1; }
+  60%  { box-shadow: 0 0 0 12px rgba(79,70,229,0); opacity:.78; }
+  100% { box-shadow: 0 0 0 0 rgba(79,70,229,0); opacity:1; }
+}
+@media (prefers-reduced-motion: reduce){
+  .btn--record.blink{ animation:none; box-shadow:0 0 0 3px rgba(79,70,229,.45); }
+}
 .btn--danger{ background:var(--danger); border-color:var(--danger); color:#fff; }
 .btn--danger:hover:not(:disabled){ background:var(--danger-hover); }
 .btn--login{ background:var(--amber-soft); border-color:var(--amber-border); color:var(--amber-ink); font-weight:600; margin-left:auto; }
@@ -390,7 +401,12 @@ body.is-phone #inputModeBox{ display:none !important; }
   transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;
 }
 .hist-row:hover{ transform:translateY(-1px); box-shadow:var(--shadow-sm); border-color:var(--accent); background:#eef2ff; }
-.hist-title{ font-weight:600; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* 行内のリンク部（タイトル＋メタ）。行末に🗑ボタンを置けるよう、リンクと削除を分けた。 */
+.hist-link{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex:1 1 auto; min-width:0; text-decoration:none; color:inherit; }
+.hist-del{ flex:0 0 auto; background:none; border:none; cursor:pointer; font-size:16px; line-height:1; padding:6px 8px; border-radius:8px; color:var(--muted); }
+.hist-del:hover:not(:disabled){ background:#fde8e8; color:#c0392b; }
+.hist-del:disabled{ opacity:.5; cursor:default; }
+.hist-title{ font-weight:600; font-size:15px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .hist-meta{ flex:0 0 auto; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
 .hist-more{
   align-self:center;

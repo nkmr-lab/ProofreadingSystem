@@ -181,8 +181,7 @@ export async function loadInReviewForCheck(key){
       const warn = (!data.cbt) ? '<div class="req-banner-hint">※結果の自動返却トークンが無いため、保存してもLabPayへは自動で戻りません（要LabPay側対応）。</div>' : '';
       el.innerHTML =
         `🛠 <b>${escapeHtml(data.requester || '')}</b> さんからの依頼（LabPay）` +
-        (data.title ? `「${escapeHtml(data.title)}」` : '') +
-        `<div class="req-banner-hint">「サーバー録音」でチェックして保存してください。</div>` + warn;
+        (data.title ? `「${escapeHtml(data.title)}」` : '') + warn;
       el.style.display = '';
     }
   } catch (e) {
@@ -200,6 +199,6 @@ function showReqBanner(data){
     `📩 <b>${escapeHtml(data.requester || '')}</b> さんからのチェック依頼` +
     (data.title ? `「${escapeHtml(data.title)}」` : '') +
     (data.message ? `<div class="req-banner-msg">${escapeHtml(data.message)}</div>` : '') +
-    `<div class="req-banner-hint">${done ? '※一度チェック済みです。もう一度チェックすると新しい結果が依頼に紐づきます。' : '「サーバー録音」でチェックして保存してください。'}</div>`;
+    (done ? '<div class="req-banner-hint">※一度チェック済みです。もう一度チェックすると新しい結果が依頼に紐づきます。</div>' : '');
   el.style.display = '';
 }

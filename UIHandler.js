@@ -82,6 +82,13 @@ export function updateButtons() {
                 setHidden('recordPause', true);
                 setHidden('recIndicator', true);
             }
+            // 依頼（pr依頼 or LabPay作業中）を開いて録音待ちのときは「サーバー録音」ボタンを点滅させ、
+            // 「ここを押して」と知らせる（以前の指示バナーの代わり）。
+            const rec = document.getElementById('recordServer');
+            if (rec) rec.classList.toggle(
+                'blink',
+                loggedIn && !appState.isRecording && !!(appState.reqUuid || appState.mrKey)
+            );
         } else {
             document.body.style.overflow = "auto";
             setHidden('description', false);

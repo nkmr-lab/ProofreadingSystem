@@ -4,12 +4,20 @@ import { updateButtons } from './UIHandler.js';
 import { appState } from './appState.js';
 import { ensureUUID, ensureUUIDLocal, getFirstPageText } from './pdfHandler.js';
 import { startMp4Recording, stopRecordingAndUpload, stopRecUI, stopRecordingLocalOnly, pauseMic, resumeMic } from './audioHandler.js';
-import { setHidden } from './htmlHandler.js';
+import { setHidden, setDisabled } from './htmlHandler.js';
 import { getPdfBlob, exportLocalRecordingAsZip, saveAnnotations } from './storageHandler.js';
 import { DrawingMode } from './drawingHandler.js';
 import { resetView } from './viewportHandler.js';
 
 export async function startRecordingOnServer(){
+  // 押した瞬間に処理中フラグを立て、二度押し（反応待ちの再クリック）を無視する。
+  if (appState.isBusy || appState.isRecording) return;
+  appState.isBusy = true;
+  const btn = document.getElementById('recordServer');
+  // 即座に無効化＋表示を変えて「押せた」ことを分かるようにする（準備には数秒かかるため）。
+  setDisabled('recordServer', true);
+  setDisabled('recordLocal', true);
+  if (btn){ btn.classList.remove('blink'); btn.textContent = '準備中…'; }
   try {
     // UUID確保（PDFアップロード＋pushStateで /{uuid} に）
     appState.recordTarget = 'server';
@@ -31,11 +39,20 @@ export async function startRecordingOnServer(){
   } catch (e) {
     console.error(e);
     alert(e.message || String(e));
+    if (btn) btn.textContent = '● サーバー録音';
     updateButtons();
+  } finally {
+    appState.isBusy = false;
   }
 }
 
 export async function startRecordingOnLocal(){
+  if (appState.isBusy || appState.isRecording) return;
+  appState.isBusy = true;
+  const btn = document.getElementById('recordLocal');
+  setDisabled('recordServer', true);
+  setDisabled('recordLocal', true);
+  if (btn) btn.textContent = '準備中…';
   try {
     // UUID確保（PDFアップロード＋pushStateで /{uuid} に）
     appState.recordTarget = 'local';
@@ -54,6 +71,9 @@ export async function startRecordingOnLocal(){
   } catch (e) {
     console.error(e);
     alert(e.message || String(e));
+    if (btn) btn.textContent = '● ローカル録音';
+  } finally {
+    appState.isBusy = false;
   }
   updateButtons();
 }
@@ -79,6 +99,14 @@ export function togglePauseRecording(){
 }
 
 export async function stopRecording(){
+  // アップロード・保存に数秒かかる。終了ボタンの二度押しで stopRecording が重複実行されるのを防ぐ。
+  if (appState.isBusy) return;
+  appState.isBusy = true;
+  const sbtn = document.getElementById('recordStop');
+  // 即座に無効化＋表示を変えて「押せた」ことを分かるようにする。
+  setDisabled('recordStop', true);
+  setDisabled('recordPause', true);
+  if (sbtn) sbtn.textContent = '■ 保存中…';
   try {
     if (appState.recordTarget === 'server') {
       const result = await stopRecordingAndUpload();
@@ -142,8 +170,10 @@ export async function stopRecording(){
   appState.isPaused = false;
   const pbtn = document.getElementById('recordPause');
   if (pbtn) pbtn.textContent = '⏸ 一時停止';
+  if (sbtn) sbtn.textContent = '■ 録音終了';   // 画面遷移しなかった場合に備えて戻す
   stopRecUI();
   updateButtons();
+  appState.isBusy = false;
 }
 
 // 1ページ目テキストから論文タイトルを抽出し、所有者metaに保存（履歴表示用）。
