@@ -86,9 +86,12 @@ async function openRequestModal(uuid, filename){
 }
 function closeRequestModal(){ document.getElementById('reqBackdrop')?.remove(); }
 
+// チェックを依頼できる相手の学年（OB・B2以下は候補に出さない）
+const REVIEWER_GRADES = new Set(['教員', 'D3', 'D2', 'D1', 'M2', 'M1', 'B4', 'B3']);
+
 function renderMembers(users){
   const byGrade = {};
-  for (const u of users){ (byGrade[u.grade] ||= []).push(u); }
+  for (const u of users){ if (!REVIEWER_GRADES.has(u.grade)) continue; (byGrade[u.grade] ||= []).push(u); }
   const grades = Object.keys(byGrade).sort((a,b)=>{
     const ia = GRADE_ORDER.indexOf(a), ib = GRADE_ORDER.indexOf(b);
     return (ia<0?99:ia) - (ib<0?99:ib);
