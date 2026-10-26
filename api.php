@@ -149,7 +149,7 @@ function list_inreview($me) {
     $items = [];
     $dir = inreview_dir();
     foreach (@scandir($dir) ?: [] as $fn) {
-        if (!preg_match('/^(\d+_\d+)\.json$/', $fn, $m)) continue;
+        if (!preg_match('/^([A-Za-z0-9_]+)\.json$/', $fn, $m)) continue;
         $t = json_decode(@file_get_contents($dir . $fn), true);
         if (!is_array($t) || !empty($t['done'])) continue;
         if (strtolower(trim($t['reviewer_email'] ?? '')) !== $meEmail) continue;
@@ -160,7 +160,7 @@ function list_inreview($me) {
 }
 // 作業中タスク1件（本人のみ）。無ければ null。
 function get_inreview($key, $me) {
-    if (!preg_match('/^\d+_\d+$/', (string)$key)) return null;
+    if (!preg_match('/^[A-Za-z0-9_]+$/', (string)$key)) return null;
     $p = inreview_dir() . $key . '.json';
     if (!is_file($p)) return null;
     $t = json_decode(@file_get_contents($p), true);
@@ -180,6 +180,7 @@ function list_my_reviews($filesDir, $me) {
         if (!is_array($o)) continue;
         if (strtolower(trim($o['email'] ?? '')) !== $meEmail || $meEmail === '') continue;
         if (isset($o['review_request'])) continue;   // 依頼の原稿は履歴でなく「依頼したチェック」へ
+        if (!empty($o['received_src'])) continue;     // LabPayから受領した原稿のコピーは履歴に出さない
         $u = $m[1];
         if (!is_file($filesDir . $u . '.pdf')) continue;   // 実体が無いものは除外
         $items[] = [
@@ -461,8 +462,46 @@ if ($method === 'POST') {
         if (($input['action'] ?? '') === 'inreview_done') {
             $key = (string)($input['key'] ?? '');
             $t = get_inreview($key, $me);   // 本人のタスクのみ
-            if ($t) @unlink(inreview_dir() . $key . '.json');
+            if ($t) {
+                if (!empty($t['source_pdf_uuid'])) delete_uuid_files($targetDir, $t['source_pdf_uuid']);   // 受領コピー掃除
+                @unlink(inreview_dir() . $key . '.json');
+            }
             echo json_encode(['status' => 'success']);
+            exit;
+        }
+
+        // ---- 1g) ハンドオフ自己登録（{action:'received_register', source_pdf_uuid, cb, cbt, title, src}）----
+        //   LabPayの「校閲する」で pr に来た時点で、ログイン中の本人の被依頼として登録（シークレット不要）。
+        if (($input['action'] ?? '') === 'received_register') {
+            $cb  = trim((string)($input['cb'] ?? ''));
+            $cbt = trim((string)($input['cbt'] ?? ''));
+            $src = trim((string)($input['src'] ?? ''));
+            $title = mb_substr(trim((string)($input['title'] ?? '')), 0, 200);
+            $srcUuid = (string)($input['source_pdf_uuid'] ?? '');
+            if (strtolower((string)parse_url($cb, PHP_URL_HOST)) !== 'pay.nkmr.io') json_error('invalid cb host', 400);
+            $reviewId = 0; $rrId = 0;
+            if (preg_match('#/manuscript-reviews/(\d+)/reviewers/(\d+)/#', $cb, $mm)) { $reviewId = (int)$mm[1]; $rrId = (int)$mm[2]; }
+            $key = ($reviewId > 0) ? ($reviewId . '_' . $rrId) : ('h' . substr(sha1($cb), 0, 15));
+            if (!is_valid_uuid($srcUuid) || !is_file($targetDir . $srcUuid . '.pdf')) $srcUuid = '';
+            if ($srcUuid !== '') {   // このPDFコピーは履歴に出さない印
+                $so = read_owner($srcUuid);
+                if (is_array($so)) { $so['received_src'] = true; meta_put(owner_path($srcUuid), json_encode($so, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)); }
+            }
+            // 既存タスクの古いコピーを掃除（再ハンドオフ時の重複防止）
+            $existing = json_decode(@file_get_contents(inreview_dir() . $key . '.json'), true);
+            if (is_array($existing) && !empty($existing['source_pdf_uuid']) && $existing['source_pdf_uuid'] !== $srcUuid) {
+                delete_uuid_files($targetDir, $existing['source_pdf_uuid']);
+            }
+            $task = [
+                'review_id' => $reviewId, 'reviewer_row_id' => $rrId,
+                'reviewer_email' => $me['email'] ?? '', 'reviewer_name' => $me['name'] ?? '',
+                'requester_name' => '', 'title' => $title,
+                'pull_url' => $src, 'result_callback' => $cb, 'cbt' => $cbt,
+                'source_pdf_uuid' => $srcUuid,
+                'accepted_at' => gmdate('c'), 'created' => gmdate('c'), 'done' => false, 'via' => 'handoff',
+            ];
+            meta_put(inreview_dir() . $key . '.json', json_encode($task, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            echo json_encode(['status' => 'success', 'key' => $key], JSON_UNESCAPED_SLASHES);
             exit;
         }
 
@@ -627,6 +666,7 @@ if ($method === 'GET' && ($_GET['action'] ?? '') === 'inreview_get') {
         'pull_url'        => $t['pull_url'] ?? '',
         'result_callback' => $t['result_callback'] ?? '',
         'cbt'             => $t['cbt'] ?? '',
+        'source_pdf_uuid' => $t['source_pdf_uuid'] ?? '',   // pr側コピー(期限切れpull_urlの代わりに使う)
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }

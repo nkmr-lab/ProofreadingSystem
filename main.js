@@ -140,9 +140,26 @@ async function maybeLoadFromHandoff() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const blob = await res.blob();
     const title = p.get('title') || 'document.pdf';
-    loadPdfFile(new File([blob], title, { type: 'application/pdf' }));
+    const file = new File([blob], title, { type: 'application/pdf' });
+    loadPdfFile(file);
     // トークンをアドレスバー/共有に残さない
     history.replaceState({}, '', location.pathname);
+
+    // ログイン中なら「被依頼」としてpr側に自己登録（PDFコピーを保存し、後で📥一覧から再開できるように）。
+    // ＝共有シークレット不要。受けた本人として登録するので email 不一致も起きない。
+    if (appState.loggedIn && cb && cbt) {
+      try {
+        const fd = new FormData(); fd.append('file', file);
+        const up = await (await fetch('api.php', { method: 'POST', body: fd })).json();
+        if (up && up.uuid) {
+          const reg = await (await fetch('api.php', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'received_register', source_pdf_uuid: up.uuid, cb, cbt, title, src }),
+          })).json();
+          if (reg && reg.key) appState.mrKey = reg.key;   // 今チェックして保存したら inreview_done で消える
+        }
+      } catch (e) { console.warn('received_register failed', e); }
+    }
   } catch (e) {
     console.error(e);
     alert('原稿の取得に失敗しました: ' + (e?.message || e));

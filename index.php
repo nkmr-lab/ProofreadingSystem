@@ -133,7 +133,7 @@ $logoutUrl = nkmrauth_logout_url();
   <span class="req-box-hint">PDFを選んで、チェックしてほしい人を指定します</span>
 </div>
 <div id="inreviewBox" style="display:none;">
-  <h2>🛠 作業中（LabPayから受けた依頼）</h2>
+  <h2>📥 依頼された原稿（LabPay）</h2>
   <div id="inreviewList"></div>
 </div>
 <div id="requestsInBox" style="display:none;">

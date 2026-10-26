@@ -161,7 +161,9 @@ export async function loadInReviewForCheck(key){
     const data = await res.json();
     if (data.status !== 'success'){ alert(data.message || '作業中タスクを開けませんでした'); location.assign('/'); return; }
 
-    const pres = await fetch(data.pull_url);   // pay.nkmr.io の署名付きPDF(15分TTL)。CORS許可済
+    // pr側に保存したコピーがあればそれを使う（pull_urlの15分TTL切れでも開ける）。無ければpull_url。
+    const pdfSrc = data.source_pdf_uuid ? ('files/' + data.source_pdf_uuid + '.pdf') : data.pull_url;
+    const pres = await fetch(pdfSrc);
     if (!pres.ok) throw new Error('pull ' + pres.status);
     const blob = await pres.blob();
     const title = (data.title && data.title.trim()) ? data.title : 'document.pdf';
