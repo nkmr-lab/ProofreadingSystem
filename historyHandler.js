@@ -26,9 +26,9 @@ function makeRow(it){
   return a;
 }
 
-const VISIBLE = 2;   // これ以下は全部表示。3件以上は最初の2件＋「もっと見る」で畳む。
+const VISIBLE = 2;   // 既定：これ以下は全部表示。超えたら先頭だけ出して「もっと見る」で畳む。
 
-function fillList(listId, boxId, items){
+function fillList(listId, boxId, items, visible = VISIBLE){
   const list = document.getElementById(listId);
   const box = document.getElementById(boxId);
   if (!list || !box || !items || !items.length) return;
@@ -36,10 +36,10 @@ function fillList(listId, boxId, items){
   const rows = items.map(makeRow);
   rows.forEach(r => list.appendChild(r));
 
-  if (items.length > VISIBLE){
-    const hiddenRows = rows.slice(VISIBLE);
+  if (items.length > visible){
+    const hiddenRows = rows.slice(visible);
     hiddenRows.forEach(r => { r.hidden = true; });
-    const n = items.length - VISIBLE;
+    const n = items.length - visible;
     let expanded = false;
     const toggle = document.createElement('button');
     toggle.type = 'button';
@@ -65,8 +65,8 @@ export async function loadMyHistory(){
     renderInReview(data.inreview || []);                      // LabPay依頼の作業中(Phase2)
     renderRequestsIn(data.requests_in || []);                 // 自分に来た依頼(未対応)
     renderRequestsOut(data.requests_out || []);               // 自分が出した依頼
-    fillList('sharedList', 'sharedBox', data.shared || []);   // 自分に共有された
-    fillList('historyList', 'historyBox', data.items || []);  // 自分が作った
+    fillList('sharedList', 'sharedBox', data.shared || []);       // 自分に共有された(既定2件)
+    fillList('historyList', 'historyBox', data.items || [], 5);   // 自分のチェック履歴は直近5件＋もっと見る
   } catch (e) {
     console.warn('履歴の取得に失敗:', e);
   }
