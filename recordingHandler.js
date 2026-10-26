@@ -110,6 +110,16 @@ export async function stopRecording(){
             });
           } catch (e) { console.warn('request_done failed', e); }
         }
+        // LabPay作業中タスクのレビューなら、結果返却(postReviewResult)済み後に作業中から外す
+        if (appState.mrKey && appState.reviewCb?.cbt) {
+          try {
+            await fetch('api.php', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'inreview_done', key: appState.mrKey }),
+            });
+          } catch (e) { console.warn('inreview_done failed', e); }
+        }
         alert('チェック結果をサーバにアップロードしました。このURLを共有して下さい。');
         setTimeout(()=>location.assign(`/${appState.uuid}`), 100);
       }

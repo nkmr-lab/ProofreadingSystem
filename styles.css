@@ -359,8 +359,8 @@ body.is-phone #inputModeBox{ display:none !important; }
 .req-chip.done{ background:#e0f2e9; color:var(--success-hover); font-weight:600; }
 .req-chip.done:hover{ background:#c9ead9; }
 
-/* ===== チェック履歴 / 共有された校正 ===== */
-#historyBox, #sharedBox{
+/* ===== ホームのダッシュボード（履歴 / 共有 / 依頼 / 作業中）===== */
+#historyBox, #sharedBox, #inreviewBox, #requestsInBox, #requestsOutBox{
   max-width:640px;
   margin:40px auto 0;
   padding:24px 28px;
@@ -368,13 +368,13 @@ body.is-phone #inputModeBox{ display:none !important; }
   border-radius:var(--radius-lg);
   box-shadow:var(--shadow-md);
 }
-#historyBox h2, #sharedBox h2{
+#historyBox h2, #sharedBox h2, #inreviewBox h2, #requestsInBox h2, #requestsOutBox h2{
   text-align:center;
   margin:0 0 18px;
   font-size:20px;
   color:var(--ink);
 }
-#historyList, #sharedList{ display:flex; flex-direction:column; gap:8px; }
+#historyList, #sharedList, #inreviewList, #requestsInList, #requestsOutList{ display:flex; flex-direction:column; gap:8px; }
 .hist-row{
   display:flex;
   align-items:center;

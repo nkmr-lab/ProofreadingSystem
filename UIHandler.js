@@ -5,7 +5,7 @@ import { appState } from './appState.js';
 
 // ホームのダッシュボード（依頼ボタン・依頼/共有/履歴一覧）はホーム(PDF未読込)でのみ表示。
 function setDashboardHidden(hidden) {
-    ['requestBox', 'requestsInBox', 'requestsOutBox', 'sharedBox', 'historyBox'].forEach(id => setHidden(id, hidden));
+    ['requestBox', 'inreviewBox', 'requestsInBox', 'requestsOutBox', 'sharedBox', 'historyBox'].forEach(id => setHidden(id, hidden));
 }
 
 export function updateButtons() {

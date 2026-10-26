@@ -12,7 +12,7 @@ import { loadSkipSetting, bindSkipSilenceUI } from './silenceHandler.js';
 import { initTranscriptUI } from './transcriptHandler.js';
 import { loadMyHistory } from './historyHandler.js';
 import { openShareDialog } from './shareHandler.js';
-import { initRequestUI, loadRequestForCheck } from './requestHandler.js';
+import { initRequestUI, loadRequestForCheck, loadInReviewForCheck } from './requestHandler.js';
 
 document.addEventListener('keydown', (event) => keydownEvent(event));
 
@@ -91,10 +91,17 @@ bindSkipSilenceUI();
 // 文字起こし（研究室ログイン限定・閲覧ページ）
 initTranscriptUI();
 
-// /?req=<uuid> は「チェック依頼のレビュー」。uuid抽出より先に判定（?req内のuuidをviewer扱いしない）。
-const _reqParam = new URLSearchParams(location.search).get('req');
-appState.uuid = _reqParam ? null : extractUUID(window.location.href);
-if (_reqParam) {
+// /?req=<uuid>（pr内の依頼）・/?mr=<key>（LabPay作業中）はチェック(録音)モードで開く。
+// uuid抽出より先に判定（?req内のuuidをviewer扱いしない）。
+const _params = new URLSearchParams(location.search);
+const _reqParam = _params.get('req');
+const _mrParam = _params.get('mr');
+appState.uuid = (_reqParam || _mrParam) ? null : extractUUID(window.location.href);
+if (_mrParam) {
+  appState.isCheckerMode = true;          // LabPay依頼の原稿をチェックモードで開く
+  initFileInputButton();
+  await loadInReviewForCheck(_mrParam);   // 保存時に result_callback 返却＋inreview_done
+} else if (_reqParam) {
   appState.isCheckerMode = true;          // 原稿をチェック(録音)モードで開く
   initFileInputButton();
   await loadRequestForCheck(_reqParam);   // 依頼原稿を読み込み、保存時に request_done で紐づく

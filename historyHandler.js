@@ -62,6 +62,7 @@ export async function loadMyHistory(){
     const res = await fetch('api.php?action=mine');
     if (res.status === 401) return;   // 未ログイン
     const data = await res.json();
+    renderInReview(data.inreview || []);                      // LabPay依頼の作業中(Phase2)
     renderRequestsIn(data.requests_in || []);                 // 自分に来た依頼(未対応)
     renderRequestsOut(data.requests_out || []);               // 自分が出した依頼
     fillList('sharedList', 'sharedBox', data.shared || []);   // 自分に共有された
@@ -69,6 +70,25 @@ export async function loadMyHistory(){
   } catch (e) {
     console.warn('履歴の取得に失敗:', e);
   }
+}
+
+// LabPay依頼の「作業中」(Phase2)。タップで /?mr=<key> を開いてチェック。
+function renderInReview(items){
+  const list = document.getElementById('inreviewList');
+  const box = document.getElementById('inreviewBox');
+  if (!list || !box || !items || !items.length) return;
+  list.innerHTML = '';
+  for (const it of items){
+    const a = document.createElement('a');
+    a.className = 'hist-row';
+    a.href = '/?mr=' + encodeURIComponent(it.key);
+    const title = it.title && it.title.trim() ? it.title : '(無題のPDF)';
+    a.innerHTML =
+      `<span class="hist-title">${escapeHtml(title)}</span>` +
+      `<span class="hist-meta">${escapeHtml(it.requester || '')}より</span>`;
+    list.appendChild(a);
+  }
+  box.style.display = '';
 }
 
 // 自分に来たチェック依頼（未対応のみ）。タップで /?req=<uuid> を開いてチェック。

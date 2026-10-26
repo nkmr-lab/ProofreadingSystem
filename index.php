@@ -132,6 +132,10 @@ $logoutUrl = nkmrauth_logout_url();
   <button id="requestBtn" class="btn btn--primary">📨 原稿チェックを依頼する</button>
   <span class="req-box-hint">PDFを選んで、チェックしてほしい人を指定します</span>
 </div>
+<div id="inreviewBox" style="display:none;">
+  <h2>🛠 作業中（LabPayから受けた依頼）</h2>
+  <div id="inreviewList"></div>
+</div>
 <div id="requestsInBox" style="display:none;">
   <h2>📩 あなたへのチェック依頼</h2>
   <div id="requestsInList"></div>

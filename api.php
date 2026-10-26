@@ -100,6 +100,75 @@ function delete_uuid_files($dir, $uuid) {
     if (is_file($wf)) @unlink($wf);
 }
 
+// ===== LabPay 連携（作業中一覧 / 受諾通知）=====
+// 作業中タスクは Web 非公開の meta/inreview/{review_id}_{reviewer_row_id}.json に保存。
+function inreview_dir() {
+    $d = meta_dir() . 'inreview/';
+    if (!is_dir($d)) { @mkdir($d, 0777, true); @file_put_contents($d . '.htaccess', "Require all denied\n"); }
+    return $d;
+}
+// pr↔LabPay サーバ間共通シークレット（config.local.php の pr_integration.shared_secret）
+function read_pr_secret() {
+    $cfg = __DIR__ . '/config.local.php';
+    if (is_file($cfg)) { $c = require $cfg; if (is_array($c)) return (string)($c['pr_integration']['shared_secret'] ?? ''); }
+    return '';
+}
+function verify_pr_secret() {
+    $secret = read_pr_secret();
+    if ($secret === '') json_error('連携シークレットが未設定です（サーバ管理者へ）', 503);
+    if (!hash_equals($secret, (string)($_SERVER['HTTP_X_PR_SECRET'] ?? ''))) json_error('invalid secret', 401);
+}
+// Phase1: LabPay が reviewer の「受ける」で呼ぶ。作業中として登録（冪等）。
+function handle_mark_in_review($input) {
+    verify_pr_secret();
+    $reviewId = (int)($input['review_id'] ?? 0);
+    $rrId     = (int)($input['reviewer_row_id'] ?? 0);
+    $email    = trim((string)($input['reviewer_email'] ?? ''));
+    if ($reviewId <= 0 || $rrId <= 0 || $email === '') json_error('missing fields', 400);
+    // pull_url / result_callback は pay.nkmr.io 限定
+    foreach (['pull_url', 'result_callback'] as $k) {
+        $h = strtolower((string)parse_url((string)($input[$k] ?? ''), PHP_URL_HOST));
+        if ($h !== 'pay.nkmr.io') json_error("invalid $k host", 400);
+    }
+    $key = $reviewId . '_' . $rrId;
+    $task = [
+        'review_id' => $reviewId, 'reviewer_row_id' => $rrId,
+        'reviewer_email' => $email, 'reviewer_name' => (string)($input['reviewer_name'] ?? ''),
+        'requester_name' => (string)($input['requester_name'] ?? ''), 'title' => (string)($input['title'] ?? ''),
+        'pull_url' => (string)($input['pull_url'] ?? ''), 'result_callback' => (string)($input['result_callback'] ?? ''),
+        'cbt' => (string)($input['cbt'] ?? ''),   // ※§4.1に無いが、来れば結果返却に使う
+        'accepted_at' => (string)($input['accepted_at'] ?? ''), 'created' => gmdate('c'), 'done' => false,
+    ];
+    meta_put(inreview_dir() . $key . '.json', json_encode($task, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    echo json_encode(['ok' => true, 'pr_task_id' => $key], JSON_UNESCAPED_SLASHES);
+}
+// Phase2: 自分の作業中タスク一覧
+function list_inreview($me) {
+    $meEmail = strtolower(trim($me['email'] ?? ''));
+    if ($meEmail === '') return [];
+    $items = [];
+    $dir = inreview_dir();
+    foreach (@scandir($dir) ?: [] as $fn) {
+        if (!preg_match('/^(\d+_\d+)\.json$/', $fn, $m)) continue;
+        $t = json_decode(@file_get_contents($dir . $fn), true);
+        if (!is_array($t) || !empty($t['done'])) continue;
+        if (strtolower(trim($t['reviewer_email'] ?? '')) !== $meEmail) continue;
+        $items[] = ['key' => $m[1], 'title' => $t['title'] ?? '', 'requester' => $t['requester_name'] ?? '', 'accepted_at' => $t['accepted_at'] ?? ($t['created'] ?? '')];
+    }
+    usort($items, fn($a, $b) => strcmp($b['accepted_at'], $a['accepted_at']));
+    return $items;
+}
+// 作業中タスク1件（本人のみ）。無ければ null。
+function get_inreview($key, $me) {
+    if (!preg_match('/^\d+_\d+$/', (string)$key)) return null;
+    $p = inreview_dir() . $key . '.json';
+    if (!is_file($p)) return null;
+    $t = json_decode(@file_get_contents($p), true);
+    if (!is_array($t)) return null;
+    if (strtolower(trim($t['reviewer_email'] ?? '')) !== strtolower(trim($me['email'] ?? ''))) return null;
+    return $t;
+}
+
 // 現在のユーザーが所有する校正の一覧（新しい順）。meta/{uuid}.json を走査。
 function list_my_reviews($filesDir, $me) {
     $meEmail = strtolower(trim($me['email'] ?? ''));
@@ -293,13 +362,20 @@ if ($method === 'POST') {
     // ---- 1) JSON保存（raw JSON: {uuid, data}）----
     $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
     if (stripos($contentType, 'application/json') !== false) {
-        $me = require_login();
         $raw = file_get_contents('php://input', false, null, 0, MAX_JSON_BYTES + 1);
         if ($raw === false) json_error('Failed to read request body');
         if (strlen($raw) > MAX_JSON_BYTES) json_error('JSON too large');
 
         $input = json_decode($raw, true);
         if (!is_array($input)) json_error('Invalid JSON payload');
+
+        // ---- Phase1: LabPay→pr 受諾通知（サーバ間・X-PR-Secret 認証・ログイン不要）----
+        if (($input['action'] ?? '') === 'mark_in_review') {
+            handle_mark_in_review($input);
+            exit;
+        }
+
+        $me = require_login();   // 以降のアクションはログイン必須
 
         // ---- 1a) 削除（{action:'delete', uuid}）----
         if (($input['action'] ?? '') === 'delete') {
@@ -377,6 +453,15 @@ if ($method === 'POST') {
             $o['review_request']['reviewers'][$meUser]['result_uuid'] = $result;
             $o['review_request']['reviewers'][$meUser]['at'] = gmdate('c');
             meta_put(owner_path($uuid), json_encode($o, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            echo json_encode(['status' => 'success']);
+            exit;
+        }
+
+        // ---- 1f) 作業中タスク完了（{action:'inreview_done', key}）＝結果返却後に一覧から消す ----
+        if (($input['action'] ?? '') === 'inreview_done') {
+            $key = (string)($input['key'] ?? '');
+            $t = get_inreview($key, $me);   // 本人のタスクのみ
+            if ($t) @unlink(inreview_dir() . $key . '.json');
             echo json_encode(['status' => 'success']);
             exit;
         }
@@ -496,6 +581,7 @@ if ($method === 'GET' && ($_GET['action'] ?? '') === 'mine') {
         'shared'       => list_shared_reviews($targetDir, $me),  // 自分に共有された
         'requests_in'  => list_requests_in($targetDir, $me),     // 自分に来た依頼(未対応)
         'requests_out' => list_requests_out($targetDir, $me),    // 自分が出した依頼
+        'inreview'     => list_inreview($me),                    // LabPay依頼の作業中(Phase2)
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
@@ -524,6 +610,23 @@ if ($method === 'GET' && ($_GET['action'] ?? '') === 'request_get') {
         'amReviewer'  => $amReviewer,
         'myStatus'    => $amReviewer ? ($rv['status'] ?? 'pending') : null,
         'myResult'    => $amReviewer ? ($rv['result_uuid'] ?? null) : null,
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+// ---- GET: 作業中タスク1件を取得（Phase2・校閲を開くため・本人のみ）----
+if ($method === 'GET' && ($_GET['action'] ?? '') === 'inreview_get') {
+    $me = require_login();
+    $t = get_inreview($_GET['key'] ?? '', $me);
+    if (!$t) json_error('作業中タスクが見つかりません', 404);
+    echo json_encode([
+        'status'          => 'success',
+        'key'             => $t['review_id'] . '_' . $t['reviewer_row_id'],
+        'title'           => $t['title'] ?? '',
+        'requester'       => $t['requester_name'] ?? '',
+        'pull_url'        => $t['pull_url'] ?? '',
+        'result_callback' => $t['result_callback'] ?? '',
+        'cbt'             => $t['cbt'] ?? '',
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }

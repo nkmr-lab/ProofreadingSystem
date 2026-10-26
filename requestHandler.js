@@ -154,6 +154,39 @@ export async function loadRequestForCheck(reqUuid){
   }
 }
 
+// ===== LabPay作業中タスク(Phase2)：/?mr=<key> で原稿をチェックモードで開く =====
+export async function loadInReviewForCheck(key){
+  try {
+    const res = await fetch('api.php?action=inreview_get&key=' + encodeURIComponent(key));
+    const data = await res.json();
+    if (data.status !== 'success'){ alert(data.message || '作業中タスクを開けませんでした'); location.assign('/'); return; }
+
+    const pres = await fetch(data.pull_url);   // pay.nkmr.io の署名付きPDF(15分TTL)。CORS許可済
+    if (!pres.ok) throw new Error('pull ' + pres.status);
+    const blob = await pres.blob();
+    const title = (data.title && data.title.trim()) ? data.title : 'document.pdf';
+    loadPdfFile(new File([blob], title.endsWith('.pdf') ? title : title + '.pdf', { type: 'application/pdf' }));
+
+    // 保存時に結果を LabPay の result_callback へ返す（postReviewResult が叩く）。cbt が無いと返せない。
+    if (data.result_callback && data.cbt) appState.reviewCb = { cb: data.result_callback, cbt: data.cbt };
+    appState.mrKey = key;
+
+    const el = document.getElementById('reqBanner');
+    if (el){
+      const warn = (!data.cbt) ? '<div class="req-banner-hint">※結果の自動返却トークンが無いため、保存してもLabPayへは自動で戻りません（要LabPay側対応）。</div>' : '';
+      el.innerHTML =
+        `🛠 <b>${escapeHtml(data.requester || '')}</b> さんからの依頼（LabPay）` +
+        (data.title ? `「${escapeHtml(data.title)}」` : '') +
+        `<div class="req-banner-hint">「サーバー録音」でチェックして保存してください。</div>` + warn;
+      el.style.display = '';
+    }
+  } catch (e) {
+    console.error(e);
+    alert('原稿の取得に失敗しました（リンク期限切れの可能性）。LabPayから開き直してください: ' + (e.message || e));
+    location.assign('/');
+  }
+}
+
 function showReqBanner(data){
   const el = document.getElementById('reqBanner');
   if (!el) return;
