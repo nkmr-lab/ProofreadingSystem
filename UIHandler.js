@@ -3,8 +3,14 @@ import { paths, pdfDoc, handleFileSelect } from "./pdfHandler.js";
 import { setHidden, setDisabled } from './htmlHandler.js';
 import { appState } from './appState.js';
 
+// ホームのダッシュボード（依頼ボタン・依頼/共有/履歴一覧）はホーム(PDF未読込)でのみ表示。
+function setDashboardHidden(hidden) {
+    ['requestBox', 'requestsInBox', 'requestsOutBox', 'sharedBox', 'historyBox'].forEach(id => setHidden(id, hidden));
+}
+
 export function updateButtons() {
     if( appState.isCheckerMode == false ){
+        setDashboardHidden(true);   // 閲覧時はダッシュボードを隠す
         // 学生側：ページボタンも描画もundoも不要（＝触らせない）
         setHidden('speedButtons', false);
         setHidden('audioPlayer', false);
@@ -35,6 +41,7 @@ export function updateButtons() {
     } else {
         if(pdfDoc){
             document.body.style.overflow = "hidden";
+            setDashboardHidden(true);   // 録音/チェック中はダッシュボードを隠す
             setHidden('description', true);
             setHidden('pdf-container', false);
             // ログイン中はサーバ蓄積に一本化（サーバー録音のみ）。

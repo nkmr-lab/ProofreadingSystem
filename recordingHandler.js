@@ -100,6 +100,16 @@ export async function stopRecording(){
         } catch (e) { /* 失敗しても閲覧時に生成できる */ }
         const shareUrl = `https://pr.nkmr.io/${appState.uuid}`;
         await postReviewResult(shareUrl);   // LabPay校閲連携なら結果URLを書き戻す
+        // pr単独のチェック依頼のレビュー中なら、結果を依頼に紐づける
+        if (appState.reqUuid) {
+          try {
+            await fetch('api.php', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'request_done', uuid: appState.reqUuid, result_uuid: appState.uuid }),
+            });
+          } catch (e) { console.warn('request_done failed', e); }
+        }
         alert('チェック結果をサーバにアップロードしました。このURLを共有して下さい。');
         setTimeout(()=>location.assign(`/${appState.uuid}`), 100);
       }

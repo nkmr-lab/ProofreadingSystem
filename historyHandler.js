@@ -62,9 +62,53 @@ export async function loadMyHistory(){
     const res = await fetch('api.php?action=mine');
     if (res.status === 401) return;   // 未ログイン
     const data = await res.json();
+    renderRequestsIn(data.requests_in || []);                 // 自分に来た依頼(未対応)
+    renderRequestsOut(data.requests_out || []);               // 自分が出した依頼
     fillList('sharedList', 'sharedBox', data.shared || []);   // 自分に共有された
     fillList('historyList', 'historyBox', data.items || []);  // 自分が作った
   } catch (e) {
     console.warn('履歴の取得に失敗:', e);
   }
+}
+
+// 自分に来たチェック依頼（未対応のみ）。タップで /?req=<uuid> を開いてチェック。
+function renderRequestsIn(items){
+  const pend = (items || []).filter(it => it.status !== 'done');
+  const list = document.getElementById('requestsInList');
+  const box = document.getElementById('requestsInBox');
+  if (!list || !box || !pend.length) return;
+  list.innerHTML = '';
+  for (const it of pend){
+    const a = document.createElement('a');
+    a.className = 'hist-row';
+    a.href = '/?req=' + encodeURIComponent(it.uuid);
+    const title = it.title && it.title.trim() ? it.title : '(無題のPDF)';
+    a.innerHTML =
+      `<span class="hist-title">${escapeHtml(title)}</span>` +
+      `<span class="hist-meta">${escapeHtml(it.requester || '')}より</span>`;
+    list.appendChild(a);
+  }
+  box.style.display = '';
+}
+
+// 自分が出した依頼。相手ごとの状態（⏳/✅＝結果リンク）を並べる。
+function renderRequestsOut(items){
+  const list = document.getElementById('requestsOutList');
+  const box = document.getElementById('requestsOutBox');
+  if (!list || !box || !items || !items.length) return;
+  list.innerHTML = '';
+  for (const it of items){
+    const row = document.createElement('div');
+    row.className = 'req-out-row';
+    const title = it.title && it.title.trim() ? it.title : '(無題のPDF)';
+    const chips = (it.reviewers || []).map(r => {
+      if (r.status === 'done' && r.result_uuid){
+        return `<a class="req-chip done" href="/${encodeURIComponent(r.result_uuid)}">${escapeHtml(r.name)} ✅</a>`;
+      }
+      return `<span class="req-chip pending">${escapeHtml(r.name)} ⏳</span>`;
+    }).join('');
+    row.innerHTML = `<div class="hist-title">${escapeHtml(title)}</div><div class="req-chips">${chips}</div>`;
+    list.appendChild(row);
+  }
+  box.style.display = '';
 }

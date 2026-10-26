@@ -325,6 +325,40 @@ body.is-phone #inputModeBox{ display:none !important; }
 .share-foot{ display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-top:12px; }
 .share-status{ font-size:12px; color:var(--muted); margin-right:auto; }
 
+/* ===== 原稿チェック依頼 ===== */
+#requestBox{
+  max-width:640px;
+  margin:40px auto 0;
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+}
+#requestBox .btn{ height:40px; font-size:15px; }
+.req-box-hint{ font-size:12px; color:var(--muted); }
+.req-banner{
+  max-width:860px; margin:12px auto 0;
+  padding:12px 16px;
+  background:var(--amber-soft); border:1px solid var(--amber-border); border-radius:var(--radius);
+  color:var(--amber-ink); font-size:14px; line-height:1.6;
+}
+.req-banner-msg{ margin-top:4px; color:var(--ink); }
+.req-banner-hint{ margin-top:4px; font-size:12px; color:var(--muted); }
+.req-file{ font-size:13px; color:var(--muted); margin-bottom:10px; word-break:break-all; }
+.req-message{
+  width:100%; margin-top:10px; min-height:60px; resize:vertical;
+  border:1px solid var(--border-strong); border-radius:var(--radius);
+  padding:8px 10px; font-family:inherit; font-size:14px; box-sizing:border-box;
+}
+.req-out-row{
+  padding:12px 16px; border:1px solid var(--border); border-radius:12px; background:#f7f8fa;
+}
+.req-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.req-chip{
+  font-size:12px; padding:3px 10px; border-radius:var(--radius-pill);
+  text-decoration:none; white-space:nowrap;
+}
+.req-chip.pending{ background:#eef0f3; color:var(--muted); }
+.req-chip.done{ background:#e0f2e9; color:var(--success-hover); font-weight:600; }
+.req-chip.done:hover{ background:#c9ead9; }
+
 /* ===== チェック履歴 / 共有された校正 ===== */
 #historyBox, #sharedBox{
   max-width:640px;

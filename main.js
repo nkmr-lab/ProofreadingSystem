@@ -12,6 +12,7 @@ import { loadSkipSetting, bindSkipSilenceUI } from './silenceHandler.js';
 import { initTranscriptUI } from './transcriptHandler.js';
 import { loadMyHistory } from './historyHandler.js';
 import { openShareDialog } from './shareHandler.js';
+import { initRequestUI, loadRequestForCheck } from './requestHandler.js';
 
 document.addEventListener('keydown', (event) => keydownEvent(event));
 
@@ -90,14 +91,21 @@ bindSkipSilenceUI();
 // 文字起こし（研究室ログイン限定・閲覧ページ）
 initTranscriptUI();
 
-appState.uuid = extractUUID(window.location.href);
-if (appState.uuid) {
+// /?req=<uuid> は「チェック依頼のレビュー」。uuid抽出より先に判定（?req内のuuidをviewer扱いしない）。
+const _reqParam = new URLSearchParams(location.search).get('req');
+appState.uuid = _reqParam ? null : extractUUID(window.location.href);
+if (_reqParam) {
+  appState.isCheckerMode = true;          // 原稿をチェック(録音)モードで開く
+  initFileInputButton();
+  await loadRequestForCheck(_reqParam);   // 依頼原稿を読み込み、保存時に request_done で紐づく
+} else if (appState.uuid) {
   appState.isCheckerMode = false;
   await loadDataFromServer(appState.uuid);
 } else {
   initFileInputButton();
   await maybeLoadFromHandoff();   // LabPay からの原稿受け取り
-  loadMyHistory();               // ホーム：自分のチェック履歴（ログイン時のみ）
+  loadMyHistory();               // ホーム：依頼/共有/履歴
+  initRequestUI();               // ホーム：原稿チェックを依頼するボタン
 }
 updateButtons();
 

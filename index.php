@@ -105,6 +105,11 @@ $logoutUrl = nkmrauth_logout_url();
 
 <audio id="audioPlayer" controls style="width:100%;"></audio>
 
+<?php if ($me): // チェック依頼でレビュー中のバナー（/?req=<uuid>） ?>
+<div id="reqBanner" class="req-banner" style="display:none;"></div>
+<input type="file" id="requestFileInput" accept="application/pdf" style="display:none;">
+<?php endif; ?>
+
 <?php if ($me): // 同期字幕パネル（研究室ログイン限定） ?>
 <div id="transcriptPanel" style="display:none;">
   <div class="transcript-head">
@@ -122,7 +127,19 @@ $logoutUrl = nkmrauth_logout_url();
     <svg id="pdfSVG" width="100%" height="100%"></svg>
 </div>
 
-<?php if ($me): // 自分のチェック履歴（ログイン時のみ） ?>
+<?php if ($me): // ホームのダッシュボード（ログイン時のみ） ?>
+<div id="requestBox">
+  <button id="requestBtn" class="btn btn--primary">📨 原稿チェックを依頼する</button>
+  <span class="req-box-hint">PDFを選んで、チェックしてほしい人を指定します</span>
+</div>
+<div id="requestsInBox" style="display:none;">
+  <h2>📩 あなたへのチェック依頼</h2>
+  <div id="requestsInList"></div>
+</div>
+<div id="requestsOutBox" style="display:none;">
+  <h2>📨 あなたが依頼したチェック</h2>
+  <div id="requestsOutList"></div>
+</div>
 <div id="sharedBox" style="display:none;">
   <h2>🤝 あなたに共有された校正</h2>
   <div id="sharedList"></div>

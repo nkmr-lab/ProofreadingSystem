@@ -110,6 +110,7 @@ function list_my_reviews($filesDir, $me) {
         $o = json_decode(@file_get_contents($metaDir . $fn), true);
         if (!is_array($o)) continue;
         if (strtolower(trim($o['email'] ?? '')) !== $meEmail || $meEmail === '') continue;
+        if (isset($o['review_request'])) continue;   // 依頼の原稿は履歴でなく「依頼したチェック」へ
         $u = $m[1];
         if (!is_file($filesDir . $u . '.pdf')) continue;   // 実体が無いものは除外
         $items[] = [
@@ -117,6 +118,60 @@ function list_my_reviews($filesDir, $me) {
             'title'   => $o['title'] ?? '',
             'created' => $o['created'] ?? '',
             'hasAudio'=> is_file($filesDir . $u . '.m4a'),
+        ];
+    }
+    usort($items, fn($a, $b) => strcmp($b['created'], $a['created']));
+    return $items;
+}
+
+// 依頼したチェック一覧（自分が作成した review_request）。各レビュアーの状態付き。
+function list_requests_out($filesDir, $me) {
+    $meEmail = strtolower(trim($me['email'] ?? ''));
+    if ($meEmail === '') return [];
+    $items = [];
+    $metaDir = meta_dir();
+    foreach (@scandir($metaDir) ?: [] as $fn) {
+        if (!preg_match('/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.json$/i', $fn, $m)) continue;
+        $o = json_decode(@file_get_contents($metaDir . $fn), true);
+        if (!is_array($o) || !isset($o['review_request'])) continue;
+        if (strtolower(trim($o['email'] ?? '')) !== $meEmail) continue;
+        $u = $m[1];
+        if (!is_file($filesDir . $u . '.pdf')) continue;
+        $rr = $o['review_request'];
+        $reviewers = [];
+        foreach (($rr['reviewers'] ?? []) as $user => $r) {
+            $reviewers[] = ['user' => $user, 'name' => $r['name'] ?? $user, 'status' => $r['status'] ?? 'pending', 'result_uuid' => $r['result_uuid'] ?? null];
+        }
+        $items[] = ['uuid' => $u, 'title' => $o['title'] ?? '', 'message' => $rr['message'] ?? '', 'created' => $rr['created'] ?? ($o['created'] ?? ''), 'reviewers' => $reviewers];
+    }
+    usort($items, fn($a, $b) => strcmp($b['created'], $a['created']));
+    return $items;
+}
+
+// 自分に来ている未対応のチェック依頼。
+function list_requests_in($filesDir, $me) {
+    $meUser  = $me['user'] ?? '';
+    $meEmail = strtolower(trim($me['email'] ?? ''));
+    if ($meUser === '') return [];
+    $items = [];
+    $metaDir = meta_dir();
+    foreach (@scandir($metaDir) ?: [] as $fn) {
+        if (!preg_match('/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.json$/i', $fn, $m)) continue;
+        $o = json_decode(@file_get_contents($metaDir . $fn), true);
+        if (!is_array($o) || !isset($o['review_request'])) continue;
+        if (strtolower(trim($o['email'] ?? '')) === $meEmail) continue;   // 自分の依頼は out 側
+        $rv = $o['review_request']['reviewers'][$meUser] ?? null;
+        if (!is_array($rv)) continue;
+        $u = $m[1];
+        if (!is_file($filesDir . $u . '.pdf')) continue;
+        $items[] = [
+            'uuid'      => $u,
+            'title'     => $o['title'] ?? '',
+            'requester' => $o['name'] ?? '',
+            'message'   => $o['review_request']['message'] ?? '',
+            'status'    => $rv['status'] ?? 'pending',
+            'result_uuid' => $rv['result_uuid'] ?? null,
+            'created'   => $o['review_request']['created'] ?? ($o['created'] ?? ''),
         ];
     }
     usort($items, fn($a, $b) => strcmp($b['created'], $a['created']));
@@ -279,6 +334,53 @@ if ($method === 'POST') {
             exit;
         }
 
+        // ---- 1d) チェック依頼を作成（{action:'request_create', uuid, reviewers:[{user,name}], message}）----
+        //   uuid = アップロード済みの原稿PDF。owner(=依頼者)だけが設定できる。
+        if (($input['action'] ?? '') === 'request_create') {
+            $uuid = $input['uuid'] ?? '';
+            if (!is_valid_uuid($uuid)) json_error('Invalid uuid');
+            $owner = read_owner($uuid);
+            $amOwner = is_array($owner) && strtolower(trim($me['email'] ?? '')) === strtolower(trim($owner['email'] ?? '')) && ($owner['email'] ?? '') !== '';
+            if (!$amOwner) json_error('原稿のアップロード者のみ依頼できます', 403);
+
+            $reviewers = [];
+            foreach ((array)($input['reviewers'] ?? []) as $r) {
+                $user = trim((string)($r['user'] ?? ''));
+                $name = trim((string)($r['name'] ?? $user));
+                if ($user === '' || !preg_match('/^[A-Za-z0-9_.-]{1,64}$/', $user)) continue;
+                if ($user === ($me['user'] ?? '')) continue;   // 自分は除外
+                $reviewers[$user] = ['name' => mb_substr($name, 0, 60), 'status' => 'pending', 'result_uuid' => null];
+            }
+            if (empty($reviewers)) json_error('チェックしてもらう相手を1人以上選んでください', 400);
+
+            $owner['review_request'] = [
+                'message'   => mb_substr(trim((string)($input['message'] ?? '')), 0, 500),
+                'reviewers' => $reviewers,
+                'created'   => gmdate('c'),
+            ];
+            meta_put(owner_path($uuid), json_encode($owner, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            echo json_encode(['status' => 'success', 'uuid' => $uuid, 'count' => count($reviewers)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        // ---- 1e) 依頼のチェック完了を記録（{action:'request_done', uuid(依頼の原稿), result_uuid(自分の校正)}）----
+        if (($input['action'] ?? '') === 'request_done') {
+            $uuid = $input['uuid'] ?? '';
+            $result = $input['result_uuid'] ?? '';
+            if (!is_valid_uuid($uuid) || !is_valid_uuid($result)) json_error('Invalid uuid');
+            $o = read_owner($uuid);
+            if (!is_array($o) || !isset($o['review_request'])) json_error('依頼が見つかりません', 404);
+            $meUser = $me['user'] ?? '';
+            if (!isset($o['review_request']['reviewers'][$meUser])) json_error('あなたはこの依頼の対象ではありません', 403);
+            if (!is_file($targetDir . $result . '.pdf')) json_error('結果の校正が見つかりません', 404);
+            $o['review_request']['reviewers'][$meUser]['status'] = 'done';
+            $o['review_request']['reviewers'][$meUser]['result_uuid'] = $result;
+            $o['review_request']['reviewers'][$meUser]['at'] = gmdate('c');
+            meta_put(owner_path($uuid), json_encode($o, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            echo json_encode(['status' => 'success']);
+            exit;
+        }
+
         // ---- 1b) タイトル抽出（{action:'title', uuid, text}）----
         if (($input['action'] ?? '') === 'title') {
             $uuid = $input['uuid'] ?? '';
@@ -389,9 +491,39 @@ if ($method === 'POST') {
 if ($method === 'GET' && ($_GET['action'] ?? '') === 'mine') {
     $me = require_login();
     echo json_encode([
-        'status' => 'success',
-        'items'  => list_my_reviews($targetDir, $me),      // 自分が作った
-        'shared' => list_shared_reviews($targetDir, $me),  // 自分に共有された
+        'status'       => 'success',
+        'items'        => list_my_reviews($targetDir, $me),      // 自分が作った
+        'shared'       => list_shared_reviews($targetDir, $me),  // 自分に共有された
+        'requests_in'  => list_requests_in($targetDir, $me),     // 自分に来た依頼(未対応)
+        'requests_out' => list_requests_out($targetDir, $me),    // 自分が出した依頼
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+// ---- GET: チェック依頼の原稿を取得（レビュアーがチェックするため）----
+if ($method === 'GET' && ($_GET['action'] ?? '') === 'request_get') {
+    $me = require_login();
+    $uuid = $_GET['uuid'] ?? '';
+    if (!is_valid_uuid($uuid)) json_error('Invalid uuid', 400);
+    $o = read_owner($uuid);
+    if (!is_array($o) || !isset($o['review_request'])) json_error('依頼が見つかりません', 404);
+    $meEmail = strtolower(trim($me['email'] ?? ''));
+    $amRequester = ($meEmail !== '' && strtolower(trim($o['email'] ?? '')) === $meEmail);
+    $rv = $o['review_request']['reviewers'][$me['user'] ?? ''] ?? null;
+    $amReviewer = is_array($rv);
+    if (!$amRequester && !$amReviewer) json_error('この依頼の閲覧権限がありません', 403);
+    if (!is_file($targetDir . $uuid . '.pdf')) json_error('原稿が見つかりません', 404);
+    echo json_encode([
+        'status'      => 'success',
+        'uuid'        => $uuid,
+        'title'       => $o['title'] ?? '',
+        'message'     => $o['review_request']['message'] ?? '',
+        'requester'   => $o['name'] ?? '',
+        'pdf'         => 'files/' . $uuid . '.pdf',
+        'amRequester' => $amRequester,
+        'amReviewer'  => $amReviewer,
+        'myStatus'    => $amReviewer ? ($rv['status'] ?? 'pending') : null,
+        'myResult'    => $amReviewer ? ($rv['result_uuid'] ?? null) : null,
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
