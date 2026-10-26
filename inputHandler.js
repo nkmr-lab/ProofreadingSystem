@@ -125,6 +125,18 @@ export function attachPointerDrawing(_pdfSVG){
     if (appState.gesturing) return;           // 2本指ピンチ/パン中は描かない
     if (!isAllowedPointer(e)) return;
 
+    // iPad ペン優先(palm rejection):
+    // ・ペン筆記中(＋直後GRACE)に来たタッチは描画に使わない＝手のひら誤爆を無視。
+    if (e.pointerType === 'touch' && performance.now() < (appState.penActiveUntil || 0)) return;
+    // ・ペンが来たら、進行中のタッチ描画を中断してペンに明け渡す
+    //   (手のひらが先に描画の主を奪ってペンが弾かれる＝「ペンが反応しない」を防ぐ)。
+    if (e.pointerType === 'pen' && activePointerId != null && activePointerType === 'touch') {
+      try { cancelDrawing(); } catch {}
+      try { _pdfSVG.releasePointerCapture(activePointerId); } catch {}
+      activePointerId = null;
+      activePointerType = null;
+    }
+
     // 既に別pointerで描画中なら無視（混線防止）
     if (activePointerId != null && activePointerId !== e.pointerId) return;
 
@@ -170,8 +182,8 @@ export function attachPointerDrawing(_pdfSVG){
     // ★Wacom/Android対策：hover（押してないmove）を混ぜない
     // pointerType pen で pressure=0 の move が混ざる機種がある
     if (activePointerType === 'pen') {
-      const pressed = (e.buttons & 1) === 1;
-      // pressure が 0 でも buttons=1 の機種があるので buttons優先
+      // 押下中だけ描く(hover除外)。buttons が取れない機種(Apple Pencil等)は pressure>0 も押下扱い。
+      const pressed = ((e.buttons & 1) === 1) || (e.pressure > 0);
       if (!pressed) return;
     }
 
