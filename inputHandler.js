@@ -188,7 +188,14 @@ export function attachPointerDrawing(_pdfSVG){
     }
 
     e.preventDefault();
-    doDrawing(e);
+    // 速い短ストロークは pointermove が間引かれて点が足りず消えやすい。
+    // 間引かれた中間点(coalesced)も拾って、短い線も確実に残す。
+    const coalesced = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
+    if (coalesced && coalesced.length > 1) {
+      for (const ce of coalesced) doDrawing(ce);
+    } else {
+      doDrawing(e);
+    }
   };
 
   const finish = (e) => {

@@ -94,6 +94,9 @@ export function startDrawing(event) {
   currentPathElement.setAttribute('stroke', appState.drawingMode === DrawingMode.ERASING ? 'rgba(0, 0, 255, 1)' : 'rgba(255, 0, 0, 1)');
   currentPathElement.setAttribute('stroke-width', '1');
   currentPathElement.setAttribute('fill', 'none');
+  // 丸い線端にして、短い線や「点」も見えるようにする（短ストロークが消える対策）
+  currentPathElement.setAttribute('stroke-linecap', 'round');
+  currentPathElement.setAttribute('stroke-linejoin', 'round');
 
   pdfSVG.appendChild(currentPathElement);
   doDrawing(event);
@@ -105,16 +108,8 @@ export function stopDrawing(event) {
 
   if (!paths[appState.currentPageNum]) paths[appState.currentPageNum] = [];
   normalizePageStrokes(appState.currentPageNum);
-
-  // mouse の場合だけ最後点を追加
-  if (typeof event.offsetX !== 'undefined') {
-    currentPath.push({
-      x: event.offsetX / pdfScale,
-      y: event.offsetY / pdfScale,
-      pressure: 0.5,
-      ts: Date.now()
-    });
-  }
+  // （最終点は pointermove 側で座標変換済みの点として既に取り込まれている。
+  //   以前は offsetX/pdfScale で追加していたが、拡大中は倍率がずれて線が飛ぶため廃止。）
 
   if (appState.drawingMode === DrawingMode.ERASING) {
     const erasedIds = eraseHitStrokes(); // ←消し軌跡全体で判定
@@ -123,7 +118,12 @@ export function stopDrawing(event) {
     redrawVisibleNow();          // 先生画面に即反映
     //saveAnnotation(appState.uuid, paths); // paths自体は消さない（履歴保持）
   } else {
-    if (currentPath.length > 1) {
+    // 短い線や「点押し」も残す。点が1つだけなら複製して、丸い線端で“点”として描けるようにする。
+    if (currentPath.length === 1) {
+      const p = currentPath[0];
+      currentPath.push({ x: p.x, y: p.y, pressure: p.pressure, ts: Date.now() });
+    }
+    if (currentPath.length >= 2) {
       const strokeId = newStrokeId();
       paths[appState.currentPageNum].push({ type: 'path', id: strokeId, points: currentPath });
       currentPath = [];
@@ -183,13 +183,14 @@ export function doDrawing(event) {
   // iOSゴースト対策：最初の点が(0,0)なら捨てる
   if (currentPath.length === 0 && x === 0 && y === 0) return;
 
-  // キャンバス外なら強制終了（drawingが残るのを防ぐ）
+  // 端で書けない対策：少しはみ出した点はストロークを止めず、ページの縁へ丸めて書き続ける。
+  // （以前は 1px でも外に出ると stopDrawing していたため、端では座標誤差で書き始められなかった。）
   const w = pdfSVG.clientWidth / pdfScale;
   const h = pdfSVG.clientHeight / pdfScale;
-  if (x < 0 || y < 0 || x > w || y > h) {
-    stopDrawing(event);
-    return;
-  }
+  const margin = 24 / pdfScale;   // これより大きく外れた点だけ無視（本当に範囲外）
+  if (x < -margin || y < -margin || x > w + margin || y > h + margin) return;
+  if (x < 0) x = 0; else if (x > w) x = w;
+  if (y < 0) y = 0; else if (y > h) y = h;
 
   // 異常ジャンプ点を捨てる（直線の原因点）
   if (lastValidPoint) {
@@ -365,6 +366,8 @@ function createPathElement(stroke, _scale) {
   pathElement.setAttribute('stroke', strokeStyle);
   pathElement.setAttribute('stroke-width', lineWidth);
   pathElement.setAttribute('fill', 'none');
+  pathElement.setAttribute('stroke-linecap', 'round');
+  pathElement.setAttribute('stroke-linejoin', 'round');
   return pathElement;
 }
 
