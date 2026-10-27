@@ -215,7 +215,10 @@ export function doDrawing(event) {
   const alpha = getAlphaFromPressure(meanP);
 
   // d は増分で追記（毎moveの全体再生成を回避）。確定時に平滑化して描き直す。
-  liveD += (liveD === '' ? 'M ' : ' L ') + (x * pdfScale) + ' ' + (y * pdfScale);
+  // 1点目は「M→同じ点へL」にして、短い線・点押しでも押した瞬間に丸い点として見えるようにする
+  //（以前は1点だと "M x y" だけで何も描かれず、素早い短ストロークが消えて見えた）。
+  const sx = x * pdfScale, sy = y * pdfScale;
+  liveD = (liveD === '') ? `M ${sx} ${sy} L ${sx} ${sy}` : (liveD + ` L ${sx} ${sy}`);
 
   let strokeStyle = `rgba(255, 0, 0, ${alpha})`;
   let lineWidth = getWidthFromPressure(meanP, pdfScale);

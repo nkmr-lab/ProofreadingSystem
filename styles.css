@@ -37,6 +37,15 @@ body{
   color:var(--ink);
   background:var(--bg);
   -webkit-text-size-adjust:100%;
+  /* 手書き中にツールバー(タイマー等)やボタン文字が選択されるのを防ぐ。
+     文字選択が要るのは入力欄だけなので、そこだけ下で許可する。 */
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-touch-callout:none;
+}
+input, textarea, [contenteditable="true"]{
+  -webkit-user-select:text;
+  user-select:text;
 }
 
 /* ===== ツールバー ===== */
