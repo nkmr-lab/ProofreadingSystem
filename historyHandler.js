@@ -12,6 +12,23 @@ function fmtDate(iso){
   const p = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
+// ISO文字列 → 秒まで（どれが新しい依頼か見分ける用）
+function fmtDateTimeSec(iso){
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+// バイト数 → 読みやすいサイズ（同じ原稿か判別する用）
+function fmtSize(bytes){
+  if (!Number.isFinite(bytes) || bytes <= 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(kb < 10 ? 1 : 0)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(mb < 10 ? 2 : 1)} MB`;
+}
 
 // 1件分の行DOMを作る。owner を渡すと「共有された」一覧用に共有者名も出す。
 // deletable=true のときは行末に🗑を出し、その場で削除できる（自分のチェック履歴のみ）。
@@ -88,11 +105,19 @@ function makeIncomingRow(opts){
   const req = (opts.requester || '').trim();
   const initial = req ? firstChar(req) : (opts.avatarFallback || '👤');
   const who = req ? `依頼主: ${req}` : (opts.requesterFallbackLabel || '');
+  // 2行目：依頼日時（秒まで）・ファイルサイズ（どれが新しいか／同じ原稿かを見分ける）
+  const subParts = [];
+  const dt = fmtDateTimeSec(opts.created);
+  if (dt) subParts.push(dt);
+  const sz = fmtSize(opts.size);
+  if (sz) subParts.push(sz);
+  const sub = subParts.join(' ・ ');
   a.innerHTML =
     `<span class="req-avatar${req ? '' : ' req-avatar--unknown'}">${escapeHtml(initial)}</span>` +
     `<span class="req-text">` +
       `<span class="hist-title">${escapeHtml(opts.title)}</span>` +
       (who ? `<span class="hist-meta">${escapeHtml(who)}</span>` : '') +
+      (sub ? `<span class="hist-meta hist-sub">${escapeHtml(sub)}</span>` : '') +
     `</span>`;
   row.appendChild(a);
   const del = document.createElement('button');
@@ -203,6 +228,8 @@ function renderInReview(items){
       requester: it.requester || '',
       requesterFallbackLabel: 'LabPay依頼',
       avatarFallback: '📥',
+      created: it.accepted_at || '',
+      size: it.size,
       list, box,
       onDelete: () => apiPost({ action: 'inreview_done', key: it.key }),   // 作業中から外す＋受領コピー掃除
     }));
@@ -226,6 +253,8 @@ function renderRequestsIn(items){
       requester: it.requester || '',
       requesterFallbackLabel: '依頼主不明',
       avatarFallback: '👤',
+      created: it.created || '',
+      size: it.size,
       list, box,
       onDelete: () => apiPost({ action: 'request_dismiss', uuid: it.uuid }),   // 自分の分だけ依頼から外す
     }));

@@ -143,7 +143,7 @@ function handle_mark_in_review($input) {
     echo json_encode(['ok' => true, 'pr_task_id' => $key], JSON_UNESCAPED_SLASHES);
 }
 // Phase2: 自分の作業中タスク一覧
-function list_inreview($me) {
+function list_inreview($me, $filesDir = null) {
     $meEmail = strtolower(trim($me['email'] ?? ''));
     if ($meEmail === '') return [];
     $items = [];
@@ -153,7 +153,11 @@ function list_inreview($me) {
         $t = json_decode(@file_get_contents($dir . $fn), true);
         if (!is_array($t) || !empty($t['done'])) continue;
         if (strtolower(trim($t['reviewer_email'] ?? '')) !== $meEmail) continue;
-        $items[] = ['key' => $m[1], 'title' => $t['title'] ?? '', 'requester' => $t['requester_name'] ?? '', 'accepted_at' => $t['accepted_at'] ?? ($t['created'] ?? '')];
+        // 受領したPDFコピーがあればそのサイズ（同一原稿の判別用）。無ければ null。
+        $size = null;
+        $src = (string)($t['source_pdf_uuid'] ?? '');
+        if ($filesDir && $src !== '' && is_file($filesDir . $src . '.pdf')) $size = @filesize($filesDir . $src . '.pdf') ?: null;
+        $items[] = ['key' => $m[1], 'title' => $t['title'] ?? '', 'requester' => $t['requester_name'] ?? '', 'accepted_at' => $t['accepted_at'] ?? ($t['created'] ?? ''), 'size' => $size];
     }
     usort($items, fn($a, $b) => strcmp($b['accepted_at'], $a['accepted_at']));
     return $items;
@@ -242,6 +246,7 @@ function list_requests_in($filesDir, $me) {
             'status'    => $rv['status'] ?? 'pending',
             'result_uuid' => $rv['result_uuid'] ?? null,
             'created'   => $o['review_request']['created'] ?? ($o['created'] ?? ''),
+            'size'      => @filesize($filesDir . $u . '.pdf') ?: null,   // 同一原稿の判別用
         ];
     }
     usort($items, fn($a, $b) => strcmp($b['created'], $a['created']));
@@ -640,7 +645,7 @@ if ($method === 'GET' && ($_GET['action'] ?? '') === 'mine') {
         'shared'       => list_shared_reviews($targetDir, $me),  // 自分に共有された
         'requests_in'  => list_requests_in($targetDir, $me),     // 自分に来た依頼(未対応)
         'requests_out' => list_requests_out($targetDir, $me),    // 自分が出した依頼
-        'inreview'     => list_inreview($me),                    // LabPay依頼の作業中(Phase2)
+        'inreview'     => list_inreview($me, $targetDir),        // LabPay依頼の作業中(Phase2)
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
