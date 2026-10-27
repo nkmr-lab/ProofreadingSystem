@@ -1,7 +1,7 @@
 import { startDrawing, stopDrawing, doDrawing, cancelDrawing } from './drawingHandler.js';
 import { appState } from './appState.js';
 import { changePage } from './pdfHandler.js';
-import { panByScreen, commitPanLog } from './viewportHandler.js';
+import { panByScreen, commitPanLog, abortGesture } from './viewportHandler.js';
 
 // ===== スマホ判定 =====
 // 指だけの狭い画面のときだけ「移動/手書き」切替を有効にする。
@@ -119,10 +119,15 @@ export function attachPointerDrawing(_pdfSVG){
   };
 
   const onDown = (e) => {
-    if (e.pointerType === 'pen') appState.penActiveUntil = performance.now() + PEN_GRACE_MS;  // palm rejection用
+    if (e.pointerType === 'pen') {
+      appState.penActiveUntil = performance.now() + PEN_GRACE_MS;  // palm rejection用
+      // ペン優先：手のひらが2点タッチと誤認されて gesturing が立っていても、
+      // ペンが降りたらジェスチャ状態を解除して必ず描けるようにする（「何度も書けない」対策）。
+      abortGesture();
+    }
     if (!appState.isCheckerMode) return;
     if (appState.isPaused) return;            // 一時停止中は描かない
-    if (appState.gesturing) return;           // 2本指ピンチ/パン中は描かない
+    if (appState.gesturing) return;           // 2本指ピンチ/パン中は描かない（ペンは上で解除済み）
     if (!isAllowedPointer(e)) return;
 
     // iPad ペン優先(palm rejection):
@@ -179,13 +184,10 @@ export function attachPointerDrawing(_pdfSVG){
     if (activePointerId == null) return;
     if (e.pointerId !== activePointerId) return;
 
-    // ★Wacom/Android対策：hover（押してないmove）を混ぜない
-    // pointerType pen で pressure=0 の move が混ざる機種がある
-    if (activePointerType === 'pen') {
-      // 押下中だけ描く(hover除外)。buttons が取れない機種(Apple Pencil等)は pressure>0 も押下扱い。
-      const pressed = ((e.buttons & 1) === 1) || (e.pressure > 0);
-      if (!pressed) return;
-    }
+    // hover（押してないmove）は、そもそも pointerdown が無く activePointerId==null で
+    // 上の分岐で弾かれている。ここまで来た pen move は接触中なので、
+    // 筆圧0の軽い接触も含めてすべて描く（以前は pressure/buttons=0 を落として
+    // Apple Pencil の軽い・短いストロークが頻繁に消えていた＝「何度も書けない」）。
 
     e.preventDefault();
     // 速い短ストロークは pointermove が間引かれて点が足りず消えやすい。

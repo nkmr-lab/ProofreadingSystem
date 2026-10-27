@@ -22,6 +22,18 @@ let s = 1, tx = 0, ty = 0;
 const pts = new Map(); // pointerId -> {x,y}
 let gesture = null;     // {s0,tx0,ty0, d0, midU, midV, mode}
 
+// 2本指が乗ったが、まだ「本気のピンチ」と確定していない待機状態（abortGestureで消せるようモジュールスコープに置く）
+let armed = false, armD0 = 0, armMx = 0, armMy = 0;
+
+// ペンが降りたときなどに、手のひら由来の2本指ジェスチャ/待機状態を強制解除する。
+// （iPadで手を置いたまま書くと gesturing が立ってペンが弾かれる＝「何度も書けない」対策）
+export function abortGesture() {
+  pts.clear();
+  gesture = null;
+  armed = false;
+  appState.gesturing = false;   // 進行中の拡大倍率(s,tx,ty)はそのまま維持
+}
+
 let lastLogAt = 0;
 let userTouchedDuringPlayback = false; // 再生中に見る人が触ったか（未使用フラグ, 将来用）
 
@@ -155,9 +167,6 @@ const COMMIT_PX = 14;   // 2本指がこの距離(指間 or 中点)動いて初�
 export function attachViewportGestures(_svg) {
   if (!_svg || _svg.__vpAttached) return;
   _svg.__vpAttached = true;
-
-  // 2本指が乗ったが、まだ「本気のピンチ」と確定していない待機状態。
-  let armed = false, armD0 = 0, armMx = 0, armMy = 0;
 
   const onDown = (e) => {
     if (e.pointerType !== 'touch') return;
