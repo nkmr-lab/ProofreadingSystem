@@ -149,7 +149,7 @@ export async function loadRequestForCheck(reqUuid){
     loadPdfFile(new File([blob], title.endsWith('.pdf') ? title : title + '.pdf', { type: 'application/pdf' }));
 
     appState.reqUuid = reqUuid;
-    showReqBanner(data);
+    // 「〜さんからの依頼」上部バナーは出さない（依頼主・日時・サイズはホーム一覧に表示）。
   } catch (e) {
     console.error(e);
     alert('依頼原稿の取得に失敗しました: ' + (e.message || e));
@@ -176,12 +176,11 @@ export async function loadInReviewForCheck(key){
     if (data.result_callback && data.cbt) appState.reviewCb = { cb: data.result_callback, cbt: data.cbt };
     appState.mrKey = key;
 
+    // 「〜さんからの依頼」上部バナーは出さない（依頼主・日時・サイズはホーム一覧に表示）。
+    // ただし自動返却トークンが無いときだけは、保存してもLabPayへ戻らない重要警告を出す。
     const el = document.getElementById('reqBanner');
-    if (el){
-      const warn = (!data.cbt) ? '<div class="req-banner-hint">※結果の自動返却トークンが無いため、保存してもLabPayへは自動で戻りません（要LabPay側対応）。</div>' : '';
-      el.innerHTML =
-        `🛠 <b>${escapeHtml(data.requester || '')}</b> さんからの依頼（LabPay）` +
-        (data.title ? `「${escapeHtml(data.title)}」` : '') + warn;
+    if (el && !data.cbt){
+      el.innerHTML = '<div class="req-banner-hint">※結果の自動返却トークンが無いため、保存してもLabPayへは自動で戻りません。保存後に表示されるURLを手動で共有してください。</div>';
       el.style.display = '';
     }
   } catch (e) {
@@ -189,16 +188,4 @@ export async function loadInReviewForCheck(key){
     alert('原稿の取得に失敗しました（リンク期限切れの可能性）。LabPayから開き直してください: ' + (e.message || e));
     location.assign('/');
   }
-}
-
-function showReqBanner(data){
-  const el = document.getElementById('reqBanner');
-  if (!el) return;
-  const done = data.myStatus === 'done';
-  el.innerHTML =
-    `📩 <b>${escapeHtml(data.requester || '')}</b> さんからのチェック依頼` +
-    (data.title ? `「${escapeHtml(data.title)}」` : '') +
-    (data.message ? `<div class="req-banner-msg">${escapeHtml(data.message)}</div>` : '') +
-    (done ? '<div class="req-banner-hint">※一度チェック済みです。もう一度チェックすると新しい結果が依頼に紐づきます。</div>' : '');
-  el.style.display = '';
 }
