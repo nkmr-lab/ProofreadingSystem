@@ -343,6 +343,8 @@ body.is-phone #inputModeBox{ display:none !important; }
   display:flex; align-items:center; gap:12px; flex-wrap:wrap;
 }
 #requestBox .btn{ height:40px; font-size:15px; }
+#reloadRequests{ margin-left:auto; }   /* 届いた依頼の再読み込みは右寄せ */
+@media (max-width:560px){ #reloadRequests{ margin-left:0; } }
 .req-box-hint{ font-size:12px; color:var(--muted); }
 .req-banner{
   max-width:860px; margin:12px auto 0;

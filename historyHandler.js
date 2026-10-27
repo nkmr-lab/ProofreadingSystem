@@ -63,8 +63,9 @@ const VISIBLE = 2;   // 既定：これ以下は全部表示。超えたら先�
 function fillList(listId, boxId, items, visible = VISIBLE, deletable = false){
   const list = document.getElementById(listId);
   const box = document.getElementById(boxId);
-  if (!list || !box || !items || !items.length) return;
-  list.innerHTML = '';
+  if (!list || !box) return;
+  list.innerHTML = '';                                   // 再読み込みでも重複しないよう毎回クリア
+  if (!items || !items.length){ box.style.display = 'none'; return; }   // 空なら箱ごと隠す
   const rows = items.map(it => makeRow(it, deletable));
   rows.forEach(r => list.appendChild(r));
 
@@ -91,7 +92,7 @@ function fillList(listId, boxId, items, visible = VISIBLE, deletable = false){
 export async function loadMyHistory(){
   if (!document.getElementById('historyBox')) return;   // 未ログインでは要素自体が無い
   try {
-    const res = await fetch('api.php?action=mine');
+    const res = await fetch('api.php?action=mine', { cache: 'no-store' });
     if (res.status === 401) return;   // 未ログイン
     const data = await res.json();
     renderInReview(data.inreview || []);                      // LabPay依頼の作業中(Phase2)
@@ -104,12 +105,35 @@ export async function loadMyHistory(){
   }
 }
 
+// ホームの「🔄 届いた依頼を再読み込み」ボタン。ページ全体をリロードせず、
+// 届いた依頼・共有・履歴の一覧だけを最新化する。
+export function bindHistoryReload(){
+  const btn = document.getElementById('reloadRequests');
+  if (!btn) return;
+  const base = btn.textContent;
+  let busy = false;
+  btn.addEventListener('click', async () => {
+    if (busy) return;
+    busy = true;
+    btn.disabled = true;
+    btn.textContent = '🔄 更新中…';
+    try {
+      await loadMyHistory();
+      btn.textContent = '✓ 最新にしました';
+    } catch {
+      btn.textContent = '⚠ 更新に失敗';
+    }
+    setTimeout(() => { btn.textContent = base; btn.disabled = false; busy = false; }, 1200);
+  });
+}
+
 // LabPay依頼の「作業中」(Phase2)。タップで /?mr=<key> を開いてチェック。
 function renderInReview(items){
   const list = document.getElementById('inreviewList');
   const box = document.getElementById('inreviewBox');
-  if (!list || !box || !items || !items.length) return;
+  if (!list || !box) return;
   list.innerHTML = '';
+  if (!items || !items.length){ box.style.display = 'none'; return; }
   for (const it of items){
     const a = document.createElement('a');
     a.className = 'hist-row';
@@ -128,8 +152,9 @@ function renderRequestsIn(items){
   const pend = (items || []).filter(it => it.status !== 'done');
   const list = document.getElementById('requestsInList');
   const box = document.getElementById('requestsInBox');
-  if (!list || !box || !pend.length) return;
+  if (!list || !box) return;
   list.innerHTML = '';
+  if (!pend.length){ box.style.display = 'none'; return; }
   for (const it of pend){
     const a = document.createElement('a');
     a.className = 'hist-row';
@@ -147,8 +172,9 @@ function renderRequestsIn(items){
 function renderRequestsOut(items){
   const list = document.getElementById('requestsOutList');
   const box = document.getElementById('requestsOutBox');
-  if (!list || !box || !items || !items.length) return;
+  if (!list || !box) return;
   list.innerHTML = '';
+  if (!items || !items.length){ box.style.display = 'none'; return; }
   for (const it of items){
     const row = document.createElement('div');
     row.className = 'req-out-row';

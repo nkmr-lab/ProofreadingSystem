@@ -10,7 +10,7 @@ import { startRecordingOnServer, startRecordingOnLocal, stopRecording, togglePau
 import { initViewport, attachViewportGestures } from './viewportHandler.js';
 import { loadSkipSetting, bindSkipSilenceUI } from './silenceHandler.js';
 import { initTranscriptUI } from './transcriptHandler.js';
-import { loadMyHistory } from './historyHandler.js';
+import { loadMyHistory, bindHistoryReload } from './historyHandler.js';
 import { openShareDialog } from './shareHandler.js';
 import { initRequestUI, loadRequestForCheck, loadInReviewForCheck } from './requestHandler.js';
 
@@ -112,6 +112,7 @@ if (_mrParam) {
   initFileInputButton();
   await maybeLoadFromHandoff();   // LabPay からの原稿受け取り
   loadMyHistory();               // ホーム：依頼/共有/履歴
+  bindHistoryReload();           // ホーム：🔄 届いた依頼を再読み込み
   initRequestUI();               // ホーム：原稿チェックを依頼するボタン
 }
 updateButtons();
