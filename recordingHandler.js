@@ -144,7 +144,7 @@ export async function stopRecording(){
             await fetch('api.php', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'inreview_done', key: appState.mrKey, result_uuid: appState.uuid }),
+              body: JSON.stringify({ action: 'inreview_done', key: appState.mrKey }),
             });
           } catch (e) { console.warn('inreview_done failed', e); }
         }
