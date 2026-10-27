@@ -2,6 +2,7 @@ import { startDrawing, stopDrawing, doDrawing, cancelDrawing } from './drawingHa
 import { appState } from './appState.js';
 import { changePage, pdfDoc } from './pdfHandler.js';
 import { panByScreen, commitPanLog, abortGesture } from './viewportHandler.js';
+import { hud } from './debugHud.js';
 
 // ===== スマホ判定 =====
 // 指だけの狭い画面のときだけ「移動/手書き」切替を有効にする。
@@ -122,28 +123,29 @@ export function attachPointerDrawing(_pdfSVG){
     if (e.pointerType === 'pen') {
       appState.penActiveUntil = performance.now() + PEN_GRACE_MS;  // palm rejection用
       // ペン優先：手のひらが2点タッチと誤認されて gesturing が立っていても、
-      // ペンが降りたらジェスチャ状態を解除して必ず描けるようにする（「何度も書けない」対策）。
+      // ペンが降りたらジェスチャ状態を解除して必ず描けるようにする。
       abortGesture();
     }
+    hud(`DN ${e.pointerType[0]} id=${e.pointerId} p=${(e.pressure||0).toFixed(2)} act=${activePointerId} g=${appState.gesturing?1:0}`);
     if (!appState.isCheckerMode) return;
     if (appState.isPaused) return;            // 一時停止中は描かない
-    if (appState.gesturing) return;           // 2本指ピンチ/パン中は描かない（ペンは上で解除済み）
-    if (!isAllowedPointer(e)) return;
+    if (appState.gesturing && e.pointerType !== 'pen') return;   // 2本指ジェスチャ中はタッチ描画しない（ペンは上で解除済み）
+    if (!isAllowedPointer(e)) { hud(`  blk notAllowed ${e.pointerType}`); return; }
 
     // iPad ペン優先(palm rejection):
     // ・ペン筆記中(＋直後GRACE)に来たタッチは描画に使わない＝手のひら誤爆を無視。
-    if (e.pointerType === 'touch' && performance.now() < (appState.penActiveUntil || 0)) return;
-    // ・ペンが来たら、進行中のタッチ描画を中断してペンに明け渡す
-    //   (手のひらが先に描画の主を奪ってペンが弾かれる＝「ペンが反応しない」を防ぐ)。
-    if (e.pointerType === 'pen' && activePointerId != null && activePointerType === 'touch') {
+    if (e.pointerType === 'touch' && performance.now() < (appState.penActiveUntil || 0)) { hud('  blk palmGrace'); return; }
+    // ・ペンは最優先：進行中の別ポインタ(手のひらのタッチ／取りこぼした前のペン)があれば
+    //   破棄して奪う（古い activePointerId が残ってペンが弾かれるのを防ぐ）。
+    if (e.pointerType === 'pen' && activePointerId != null && activePointerId !== e.pointerId) {
       try { cancelDrawing(); } catch {}
       try { _pdfSVG.releasePointerCapture(activePointerId); } catch {}
       activePointerId = null;
       activePointerType = null;
     }
 
-    // 既に別pointerで描画中なら無視（混線防止）
-    if (activePointerId != null && activePointerId !== e.pointerId) return;
+    // 既に別pointerで描画中なら無視（混線防止。ただしペンは上で奪取済み）
+    if (activePointerId != null && activePointerId !== e.pointerId) { hud('  blk busy'); return; }
 
     // スマホの「移動」「おまかせ」：専用ハンドリング（「手書き」は従来どおり下へ）
     if (isPhone() && e.pointerType === 'touch' && appState.touchMode !== 'draw') {
@@ -168,12 +170,27 @@ export function attachPointerDrawing(_pdfSVG){
 
     try { _pdfSVG.setPointerCapture(e.pointerId); } catch {}
 
+    hud(`  START ${e.pointerType}`);
     startDrawing(e);
   };
 
   const onMove = (e) => {
     if (e.pointerType === 'pen') appState.penActiveUntil = performance.now() + PEN_GRACE_MS;  // palm rejection用
     if (!appState.isCheckerMode) return;
+
+    // 取りこぼし保険：ペンが押下中(pressure>0 or buttons)なのに描画が始まっていなければ、
+    // ここで開始する（pointerdownが弾かれた/届かなかったケースを救う）。
+    if (e.pointerType === 'pen' && activePointerId == null &&
+        !appState.isPaused && appState.inputMode.pen &&
+        ((e.pressure > 0) || ((e.buttons & 1) === 1))) {
+      abortGesture();
+      activePointerId = e.pointerId;
+      activePointerType = 'pen';
+      try { _pdfSVG.setPointerCapture(e.pointerId); } catch {}
+      hud('  MV->START pen (recovered)');
+      startDrawing(e);
+      return;
+    }
 
     // スマホ move/auto 中
     if (phoneGesture && e.pointerId === activePointerId) { handlePhoneMove(e); return; }
@@ -211,6 +228,7 @@ export function attachPointerDrawing(_pdfSVG){
       return;
     }
 
+    hud(`${e.type.slice(7,9).toUpperCase()} ${e.pointerType[0]} id=${e.pointerId} act=${activePointerId}`);
     if (!appState.isCheckerMode) return;
     if (!isAllowedPointer(e)) return;
 

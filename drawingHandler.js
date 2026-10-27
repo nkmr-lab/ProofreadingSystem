@@ -198,8 +198,9 @@ export function doDrawing(event) {
     const dy = y - lastValidPoint.y;
     const dist2 = dx*dx + dy*dy;
 
-    // 画面上で 80px 相当以上のジャンプは異常として捨てる
-    const maxJump = 80 / pdfScale;
+    // デジタイザの瞬間的な飛び値(テレポート)だけを捨てる。閾値が小さすぎると
+    // 速い/長いストロークで連続して弾かれ、以降の点が全部落ちて線が書けなくなるため広めに取る。
+    const maxJump = 300 / pdfScale;
     if (dist2 > maxJump * maxJump) {
       return; // この点は入れない
     }

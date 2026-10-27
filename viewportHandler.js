@@ -7,6 +7,7 @@
 import { appState } from './appState.js';
 import { cancelDrawing } from './drawingHandler.js';
 import { logView, isRecordingTimeline } from './timelineHandler.js';
+import { hud } from './debugHud.js';
 
 const MIN_SCALE = 1;      // これ以上引けない（ページ全体でストップ）
 const MAX_SCALE = 6;      // 最大600%
@@ -183,6 +184,10 @@ export function attachViewportGestures(_svg) {
 
   const onMove = (e) => {
     if (e.pointerType !== 'touch') return;
+    // ★ペン最優先：ペン筆記中(＋直後GRACE)は、手のひら等のタッチでジェスチャを開始/継続しない。
+    //   これが無いと、先に触れていた手のひらが少し動いた瞬間にピンチ誤判定→cancelDrawingで
+    //   書きかけのペンのストロークが丸ごと消えていた（長い線ほど起きやすい）。
+    if (performance.now() < (appState.penActiveUntil || 0)) return;
     if (!pts.has(e.pointerId)) return;
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pts.size < 2) return;
@@ -195,6 +200,7 @@ export function attachViewportGestures(_svg) {
       const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
       if (Math.abs(d - armD0) > COMMIT_PX || Math.hypot(mx - armMx, my - armMy) > COMMIT_PX) {
         appState.gesturing = true;
+        hud('VP gesture commit -> cancelDrawing');
         try { cancelDrawing(); } catch {}
         startGesture();   // 現在の2指で基準を取り直す（閾値分のジャンプ防止）
       } else {
