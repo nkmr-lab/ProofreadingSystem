@@ -515,7 +515,7 @@ if ($method === 'POST') {
             $task = [
                 'review_id' => $reviewId, 'reviewer_row_id' => $rrId,
                 'reviewer_email' => $me['email'] ?? '', 'reviewer_name' => $me['name'] ?? '',
-                'requester_name' => '', 'title' => $title,
+                'requester_name' => mb_substr(trim((string)($input['requester'] ?? '')), 0, 60), 'title' => $title,
                 'pull_url' => $src, 'result_callback' => $cb, 'cbt' => $cbt,
                 'source_pdf_uuid' => $srcUuid,
                 'accepted_at' => gmdate('c'), 'created' => gmdate('c'), 'done' => false, 'via' => 'handoff',

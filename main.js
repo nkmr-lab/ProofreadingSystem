@@ -153,9 +153,11 @@ async function maybeLoadFromHandoff() {
         const fd = new FormData(); fd.append('file', file);
         const up = await (await fetch('api.php', { method: 'POST', body: fd })).json();
         if (up && up.uuid) {
+          // 依頼主名（LabPayが「校閲する」リンクに requester / from を乗せてくれれば📥に表示できる）
+          const requester = p.get('requester') || p.get('from') || '';
           const reg = await (await fetch('api.php', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'received_register', source_pdf_uuid: up.uuid, cb, cbt, title, src }),
+            body: JSON.stringify({ action: 'received_register', source_pdf_uuid: up.uuid, cb, cbt, title, src, requester }),
           })).json();
           if (reg && reg.key) appState.mrKey = reg.key;   // 今チェックして保存したら inreview_done で消える
         }

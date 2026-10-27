@@ -414,6 +414,18 @@ body.is-phone #inputModeBox{ display:none !important; }
 .hist-row:hover{ transform:translateY(-1px); box-shadow:var(--shadow-sm); border-color:var(--accent); background:#eef2ff; }
 /* 行内のリンク部（タイトル＋メタ）。行末に🗑ボタンを置けるよう、リンクと削除を分けた。 */
 .hist-link{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex:1 1 auto; min-width:0; text-decoration:none; color:inherit; }
+/* 届いた依頼の行：依頼主アイコン＋（タイトル／名前）を左寄せで並べる */
+.hist-link--req{ justify-content:flex-start; gap:10px; }
+.req-avatar{
+  flex:0 0 auto;
+  width:34px; height:34px; border-radius:50%;
+  background:var(--accent); color:#fff;
+  font-size:14px; font-weight:700; line-height:1;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.req-avatar--unknown{ background:var(--muted); }
+.req-text{ display:flex; flex-direction:column; min-width:0; gap:2px; }
+.req-text .hist-meta{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .hist-del{ flex:0 0 auto; background:none; border:none; cursor:pointer; font-size:16px; line-height:1; padding:6px 8px; border-radius:8px; color:var(--muted); }
 .hist-del:hover:not(:disabled){ background:#fde8e8; color:#c0392b; }
 .hist-del:disabled{ opacity:.5; cursor:default; }

@@ -70,17 +70,30 @@ async function apiPost(body){
   return d;
 }
 
-// 「届いた依頼」用の1行（タイトル＋補足＋🗑削除）。削除は本人が明示的に押したときだけ実行。
-//  opts: { href, title, meta, list, box, onDelete }
+// 名前の先頭1文字（絵文字・サロゲートも1文字として安全に取り出す）
+function firstChar(s){
+  s = (s || '').trim();
+  if (!s) return '';
+  return Array.from(s)[0] || '';
+}
+
+// 「届いた依頼」用の1行（依頼主アイコン＋名前／タイトル＋🗑削除）。削除は本人が明示的に押したときだけ実行。
+//  opts: { href, title, requester, requesterFallbackLabel, avatarFallback, list, box, onDelete }
 function makeIncomingRow(opts){
   const row = document.createElement('div');
   row.className = 'hist-row';
   const a = document.createElement('a');
-  a.className = 'hist-link';
+  a.className = 'hist-link hist-link--req';
   a.href = opts.href;
+  const req = (opts.requester || '').trim();
+  const initial = req ? firstChar(req) : (opts.avatarFallback || '👤');
+  const who = req ? `依頼主: ${req}` : (opts.requesterFallbackLabel || '');
   a.innerHTML =
-    `<span class="hist-title">${escapeHtml(opts.title)}</span>` +
-    `<span class="hist-meta">${escapeHtml(opts.meta || '')}</span>`;
+    `<span class="req-avatar${req ? '' : ' req-avatar--unknown'}">${escapeHtml(initial)}</span>` +
+    `<span class="req-text">` +
+      `<span class="hist-title">${escapeHtml(opts.title)}</span>` +
+      (who ? `<span class="hist-meta">${escapeHtml(who)}</span>` : '') +
+    `</span>`;
   row.appendChild(a);
   const del = document.createElement('button');
   del.type = 'button';
@@ -187,7 +200,9 @@ function renderInReview(items){
     list.appendChild(makeIncomingRow({
       href: '/?mr=' + encodeURIComponent(it.key),
       title,
-      meta: `${it.requester || ''}より`,
+      requester: it.requester || '',
+      requesterFallbackLabel: 'LabPay依頼',
+      avatarFallback: '📥',
       list, box,
       onDelete: () => apiPost({ action: 'inreview_done', key: it.key }),   // 作業中から外す＋受領コピー掃除
     }));
@@ -208,7 +223,9 @@ function renderRequestsIn(items){
     list.appendChild(makeIncomingRow({
       href: '/?req=' + encodeURIComponent(it.uuid),
       title,
-      meta: `${it.requester || ''}より`,
+      requester: it.requester || '',
+      requesterFallbackLabel: '依頼主不明',
+      avatarFallback: '👤',
       list, box,
       onDelete: () => apiPost({ action: 'request_dismiss', uuid: it.uuid }),   // 自分の分だけ依頼から外す
     }));
