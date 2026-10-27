@@ -288,6 +288,32 @@ function read_openai_key() {
     return '';
 }
 
+// Slack Incoming Webhook URL（サーバのみの config.local.php）。未設定なら空＝通知しない。
+function read_slack_webhook() {
+    $cfg = __DIR__ . '/config.local.php';
+    if (is_file($cfg)) { $c = require $cfg; if (is_array($c)) return (string)($c['slack_webhook'] ?? ''); }
+    return '';
+}
+
+// Slack へテキストを1件投稿（best-effort。webhook未設定・失敗でも保存処理は止めない）。
+function slack_notify($text) {
+    $url = read_slack_webhook();
+    if ($url === '' || !preg_match('#^https://hooks\.slack\.com/#', $url)) return;
+    $text = (string)$text;
+    if ($text === '') return;
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_POSTFIELDS => json_encode(['text' => $text], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 6,
+        CURLOPT_CONNECTTIMEOUT => 4,
+    ]);
+    @curl_exec($ch);
+    curl_close($ch);
+}
+
 // 所有者meta のタイトルだけ更新（他フィールドは温存）
 function update_owner_title($uuid, $title) {
     $p = owner_path($uuid);
@@ -459,6 +485,11 @@ if ($method === 'POST') {
             $o['review_request']['reviewers'][$meUser]['result_uuid'] = $result;
             $o['review_request']['reviewers'][$meUser]['at'] = gmdate('c');
             meta_put(owner_path($uuid), json_encode($o, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            // 依頼者へSlackでチェックURLを通知（サーバ録音の保存完了＝request_doneのタイミング）
+            $reqName = trim((string)($o['name'] ?? '')); if ($reqName === '') $reqName = '依頼者';
+            $revName = trim((string)($me['name'] ?? $me['user'] ?? '')); if ($revName === '') $revName = 'レビュアー';
+            $docTitle = trim((string)($o['title'] ?? '')); if ($docTitle === '') $docTitle = '(無題のPDF)';
+            slack_notify("✅ {$revName} さんが {$reqName} さんの原稿「{$docTitle}」をチェックしました\nhttps://pr.nkmr.io/{$result}");
             echo json_encode(['status' => 'success']);
             exit;
         }
@@ -488,6 +519,15 @@ if ($method === 'POST') {
             $key = (string)($input['key'] ?? '');
             $t = get_inreview($key, $me);   // 本人のタスクのみ
             if ($t) {
+                // 保存完了からの呼び出し（result_uuid 付き）のときだけ依頼者へSlack通知。
+                // 🗑削除からの呼び出しは result_uuid 無し＝通知しない。
+                $result = (string)($input['result_uuid'] ?? '');
+                if (is_valid_uuid($result)) {
+                    $reqName = trim((string)($t['requester_name'] ?? '')); if ($reqName === '') $reqName = '依頼者(LabPay)';
+                    $revName = trim((string)($me['name'] ?? $me['user'] ?? '')); if ($revName === '') $revName = 'レビュアー';
+                    $docTitle = trim((string)($t['title'] ?? '')); if ($docTitle === '') $docTitle = '(無題のPDF)';
+                    slack_notify("✅ {$revName} さんが {$reqName} さんの原稿「{$docTitle}」をチェックしました\nhttps://pr.nkmr.io/{$result}");
+                }
                 if (!empty($t['source_pdf_uuid'])) delete_uuid_files($targetDir, $t['source_pdf_uuid']);   // 受領コピー掃除
                 @unlink(inreview_dir() . $key . '.json');
             }
