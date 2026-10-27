@@ -1,6 +1,6 @@
 import { startDrawing, stopDrawing, doDrawing, cancelDrawing } from './drawingHandler.js';
 import { appState } from './appState.js';
-import { changePage } from './pdfHandler.js';
+import { changePage, pdfDoc } from './pdfHandler.js';
 import { panByScreen, commitPanLog, abortGesture } from './viewportHandler.js';
 
 // ===== スマホ判定 =====
@@ -235,6 +235,50 @@ export function attachPointerDrawing(_pdfSVG){
   _pdfSVG.addEventListener('lostpointercapture', finish, { passive:false });
 
   _pdfSVG.__ptr = { onDown, onMove, onUp: finish };
+}
+
+// ===== Pen ON / Touch OFF 時の、指での端スワイプによるページめくり =====
+// タッチを手書きに使わない設定(inputMode.touch===false)のとき、指は描画に使わない代わりに
+//  ・画面右1/5から始めた左スワイプ → 次ページ
+//  ・画面左1/5から始めた右スワイプ → 前ページ
+// にする。2本指(ピンチ/パン)は viewport 側に任せるため、単指のときだけ扱う。
+export function attachEdgeSwipeNav(svg){
+  if (!svg || svg.__edgeSwipe) return;
+  svg.__edgeSwipe = true;
+
+  const EDGE_FRAC = 1 / 5;    // 端とみなす幅（画面幅に対する割合）
+  const MIN_DX = 60;          // ページめくりとみなす最小の横移動(px)
+  const OFF_AXIS = 0.8;       // |dy| <= |dx|*0.8 ＝ ほぼ水平なら有効
+
+  let active = null;          // {id, x0, y0}
+  let touchCount = 0;
+
+  const usable = () => appState.isCheckerMode && !appState.inputMode.touch && !!pdfDoc;
+
+  svg.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch') return;
+    touchCount++;
+    if (!usable() || touchCount > 1) { active = null; return; }   // タッチ描画ON or 2本指は対象外
+    active = { id: e.pointerId, x0: e.clientX, y0: e.clientY };
+  }, { passive: true });
+
+  const endTrack = (e) => {
+    if (e.pointerType === 'touch') touchCount = Math.max(0, touchCount - 1);
+    if (!active || e.pointerId !== active.id) return;
+    const a = active; active = null;
+    if (!usable() || touchCount > 0) return;                       // 指が残る＝複数指ジェスチャ
+    const dx = e.clientX - a.x0;
+    const dy = e.clientY - a.y0;
+    if (Math.abs(dx) < MIN_DX) return;
+    if (Math.abs(dy) > Math.abs(dx) * OFF_AXIS) return;            // 縦が大きい＝ページめくりでない
+    const W = window.innerWidth || document.documentElement.clientWidth || 1;
+    const fromRight = a.x0 >= W * (1 - EDGE_FRAC);
+    const fromLeft  = a.x0 <= W * EDGE_FRAC;
+    if (fromRight && dx < 0) changePage(1);        // 右端から左へ → 次ページ
+    else if (fromLeft && dx > 0) changePage(-1);   // 左端から右へ → 前ページ
+  };
+  svg.addEventListener('pointerup', endTrack, { passive: true });
+  svg.addEventListener('pointercancel', endTrack, { passive: true });
 }
 
 export function syncStateFromCheckboxes(){

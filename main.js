@@ -3,7 +3,7 @@ import { undoLast } from './drawingHandler.js';
 import { updateButtons, toggleDrawingMode, initFileInputButton } from './UIHandler.js';
 import { extractUUID } from './subModule.js';
 import { bindInputModeUI, syncStateFromCheckboxes, loadInputSettings, keydownEvent,
-         bindTouchModeUI, loadTouchMode, initDeviceInputUI } from './inputHandler.js';
+         bindTouchModeUI, loadTouchMode, initDeviceInputUI, attachEdgeSwipeNav } from './inputHandler.js';
 import { appState } from './appState.js';
 import { loadDataFromServer, importZipFile, deleteReviewFromServer } from './storageHandler.js';
 import { startRecordingOnServer, startRecordingOnLocal, stopRecording, togglePauseRecording } from './recordingHandler.js';
@@ -74,6 +74,7 @@ appState.isCheckerMode = document.getElementById('bodyContent')?.dataset?.checke
 const _pdfSVGEl = document.getElementById('pdfSVG');
 initViewport(_pdfSVGEl, document.getElementById('pdf-container'));
 attachViewportGestures(_pdfSVGEl);
+attachEdgeSwipeNav(_pdfSVGEl);   // Pen ON/Touch OFF 時、指の端スワイプでページめくり
 
 loadInputSettings();
 syncStateFromCheckboxes();
