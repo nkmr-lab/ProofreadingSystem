@@ -58,6 +58,54 @@ function makeRow(it, deletable = false){
   return row;
 }
 
+// api.php への JSON POST（成功以外は例外）
+async function apiPost(body){
+  const r = await fetch('api.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.status !== 'success') throw new Error(d.message || `失敗しました (${r.status})`);
+  return d;
+}
+
+// 「届いた依頼」用の1行（タイトル＋補足＋🗑削除）。削除は本人が明示的に押したときだけ実行。
+//  opts: { href, title, meta, list, box, onDelete }
+function makeIncomingRow(opts){
+  const row = document.createElement('div');
+  row.className = 'hist-row';
+  const a = document.createElement('a');
+  a.className = 'hist-link';
+  a.href = opts.href;
+  a.innerHTML =
+    `<span class="hist-title">${escapeHtml(opts.title)}</span>` +
+    `<span class="hist-meta">${escapeHtml(opts.meta || '')}</span>`;
+  row.appendChild(a);
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'hist-del';
+  del.title = '削除';
+  del.setAttribute('aria-label', '削除');
+  del.textContent = '🗑';
+  del.addEventListener('click', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm(`「${opts.title || '(無題のPDF)'}」を届いた依頼の一覧から削除します。よろしいですか？`)) return;
+    del.disabled = true;
+    try {
+      await opts.onDelete();
+      row.remove();
+      if (opts.list && opts.box && !opts.list.querySelector('.hist-row')) opts.box.style.display = 'none';
+    } catch (err) {
+      del.disabled = false;
+      alert(err?.message || '削除に失敗しました');
+    }
+  });
+  row.appendChild(del);
+  return row;
+}
+
 const VISIBLE = 2;   // 既定：これ以下は全部表示。超えたら先頭だけ出して「もっと見る」で畳む。
 
 function fillList(listId, boxId, items, visible = VISIBLE, deletable = false){
@@ -135,14 +183,14 @@ function renderInReview(items){
   list.innerHTML = '';
   if (!items || !items.length){ box.style.display = 'none'; return; }
   for (const it of items){
-    const a = document.createElement('a');
-    a.className = 'hist-row';
-    a.href = '/?mr=' + encodeURIComponent(it.key);
     const title = it.title && it.title.trim() ? it.title : '(無題のPDF)';
-    a.innerHTML =
-      `<span class="hist-title">${escapeHtml(title)}</span>` +
-      `<span class="hist-meta">${escapeHtml(it.requester || '')}より</span>`;
-    list.appendChild(a);
+    list.appendChild(makeIncomingRow({
+      href: '/?mr=' + encodeURIComponent(it.key),
+      title,
+      meta: `${it.requester || ''}より`,
+      list, box,
+      onDelete: () => apiPost({ action: 'inreview_done', key: it.key }),   // 作業中から外す＋受領コピー掃除
+    }));
   }
   box.style.display = '';
 }
@@ -156,14 +204,14 @@ function renderRequestsIn(items){
   list.innerHTML = '';
   if (!pend.length){ box.style.display = 'none'; return; }
   for (const it of pend){
-    const a = document.createElement('a');
-    a.className = 'hist-row';
-    a.href = '/?req=' + encodeURIComponent(it.uuid);
     const title = it.title && it.title.trim() ? it.title : '(無題のPDF)';
-    a.innerHTML =
-      `<span class="hist-title">${escapeHtml(title)}</span>` +
-      `<span class="hist-meta">${escapeHtml(it.requester || '')}より</span>`;
-    list.appendChild(a);
+    list.appendChild(makeIncomingRow({
+      href: '/?req=' + encodeURIComponent(it.uuid),
+      title,
+      meta: `${it.requester || ''}より`,
+      list, box,
+      onDelete: () => apiPost({ action: 'request_dismiss', uuid: it.uuid }),   // 自分の分だけ依頼から外す
+    }));
   }
   box.style.display = '';
 }

@@ -458,6 +458,26 @@ if ($method === 'POST') {
             exit;
         }
 
+        // ---- 1e') 自分宛ての依頼を一覧から削除（{action:'request_dismiss', uuid}）----
+        //   被依頼者が「未完了の自分の分」だけを明示的に取り下げる（他のレビュアーや原稿は残す）。
+        if (($input['action'] ?? '') === 'request_dismiss') {
+            $uuid = $input['uuid'] ?? '';
+            if (!is_valid_uuid($uuid)) json_error('Invalid uuid');
+            $o = read_owner($uuid);
+            if (!is_array($o) || !isset($o['review_request'])) json_error('依頼が見つかりません', 404);
+            $meUser = $me['user'] ?? '';
+            if ($meUser === '' || !isset($o['review_request']['reviewers'][$meUser])) {
+                json_error('あなたはこの依頼の対象ではありません', 403);
+            }
+            if (($o['review_request']['reviewers'][$meUser]['status'] ?? 'pending') === 'done') {
+                json_error('完了済みの依頼は削除できません', 400);
+            }
+            unset($o['review_request']['reviewers'][$meUser]);
+            meta_put(owner_path($uuid), json_encode($o, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            echo json_encode(['status' => 'success']);
+            exit;
+        }
+
         // ---- 1f) 作業中タスク完了（{action:'inreview_done', key}）＝結果返却後に一覧から消す ----
         if (($input['action'] ?? '') === 'inreview_done') {
             $key = (string)($input['key'] ?? '');
