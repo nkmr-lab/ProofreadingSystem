@@ -288,6 +288,90 @@ function read_openai_key() {
     return '';
 }
 
+// Slack Incoming Webhook（#labpay 等・サーバのみの config.local.php の slack_webhook）。未設定なら通知しない。
+function read_slack_webhook() {
+    $cfg = __DIR__ . '/config.local.php';
+    if (is_file($cfg)) { $c = require $cfg; if (is_array($c)) return (string)($c['slack_webhook'] ?? ''); }
+    return '';
+}
+function slack_notify($text) {
+    $url = read_slack_webhook();
+    if ($url === '' || strpos($url, 'https://hooks.slack.com/') !== 0) return;
+    if ((string)$text === '') return;
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_POSTFIELDS => json_encode(['text' => (string)$text], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 6,
+        CURLOPT_CONNECTTIMEOUT => 4,
+    ]);
+    @curl_exec($ch);
+    curl_close($ch);
+}
+
+// ===== AI査読（LabPay由来のプロンプト）: 原稿PDFを読んで構造化レビューをJSONで返す =====
+function review_system_prompt() {
+    $base = <<<'EOT'
+あなたは HCI / CSCW 分野で 10 年以上のキャリアを持つ経験豊富な査読者です。与えられた PDF の論文を入念に読み、章立てを意識して日本語で要約し、続けて指定された会議基準で厳密な査読コメントを作ってください。返答は valid JSON のみ。説明文や markdown のコードフェンスは付けないこと。
+
+【特に丁寧に検査するチェックリスト】
+1. **貢献の妥当性**: 主張する貢献 (research contribution) が文献的に新規性があるか、関連研究との差分が明示されているか、「これまで誰も解決していなかった」と言える根拠があるか。過大な主張・水増しがないか。
+2. **実験/統計の記述漏れ**: 参加者数 N / 被験者属性 / 倫理審査 / インフォームドコンセント / 報酬 / 環境 (機材・実験室・オンライン) / プレテスト / 統計手法 (検定の選択理由 / 効果量 / 多重比較補正 / 仮定検証) / 有意水準 / 信頼区間 / サンプルサイズ計算 / 欠損データ処理が漏れなく書かれているか。
+3. **論理的なつながり**: 段落間 / 章間で「だから何?」が読者に伝わる接続詞・主張展開になっているか。唐突に新概念が出る箇所、結論が飛躍してる箇所がないか。
+4. **背景 → 手法 → 実験 → 結果 → 議論の一気通貫性**:
+   - 背景で挙げた問題が、手法で解決される設計になっているか
+   - 手法で導入した要素が、実験で正しく評価されているか (条件設計 / 比較対象が適切か)
+   - 実験結果が、議論・結論で元の問題に対する回答として一貫して整理されているか
+   - もし途中で目的・手段・評価の軸がずれていたら明示すること
+5. **仮説/問いと結果の対応**: Introduction で立てた仮説 (H1, H2,...) や RQ (RQ1, RQ2,...) が、 Results / Discussion で 1 つ 1 つ明示的に対応づけて議論されているか。立てた問いが結果で「答えられた / 答えられなかった」のどちらかが明確になっているか。
+6. **用語・編集面の精査**:
+   - 用語の一貫性 (同じ概念に対して異なる表記がないか、略語の初出での説明があるか)
+   - 専門用語の説明不足 (会議の想定読者層を超える専門用語が定義なしで使われていないか)
+   - 図表の参照 (全ての Figure / Table が本文中で言及されているか、言及だけで本文に説明がない図表はないか)
+EOT;
+    $schema = "\n\n会議基準は一般的な HCI / CSCW 国際会議（CHI / CSCW 相当）とします。"
+        . "\n【出力形式】返答は次のキーを持つ valid JSON のみ（コードフェンス禁止）:"
+        . "\n- \"summary\": string（章立てを意識した日本語要約。見出しごとに改行してよい）"
+        . "\n- \"strengths\": string[]（良い点）"
+        . "\n- \"weaknesses\": string[]（改善点）"
+        . "\n- \"checklist\": 配列。各要素は {\"item\": string, \"comment\": string}（上記チェックリスト1〜6それぞれの所見）"
+        . "\n- \"overall\": string（総評）"
+        . "\n- \"judgment\": string（\"採録\" | \"条件付き採録\" | \"再査読\" | \"不採録\" のいずれか）";
+    return $base . $schema;
+}
+function pdf_to_text($pdfPath) {
+    if (!is_file($pdfPath)) return '';
+    $out = @shell_exec('/usr/bin/pdftotext -enc UTF-8 -q ' . escapeshellarg($pdfPath) . ' - 2>/dev/null');
+    return is_string($out) ? trim($out) : '';
+}
+function openai_review($text) {
+    $key = read_openai_key();
+    if ($key === '') return [500, '{"error":"no key"}'];
+    $payload = [
+        'model'           => 'gpt-4o',
+        'temperature'     => 0.2,
+        'response_format' => ['type' => 'json_object'],
+        'messages'        => [
+            ['role' => 'system', 'content' => review_system_prompt()],
+            ['role' => 'user',   'content' => mb_substr($text, 0, 48000)],
+        ],
+    ];
+    $ch = curl_init('https://api.openai.com/v1/chat/completions');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $key, 'Content-Type: application/json'],
+        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 180,
+    ]);
+    $resp = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return [$code, (string)$resp];
+}
+
 // 所有者meta のタイトルだけ更新（他フィールドは温存）
 function update_owner_title($uuid, $title) {
     $p = owner_path($uuid);
@@ -441,6 +525,11 @@ if ($method === 'POST') {
                 'created'   => gmdate('c'),
             ];
             meta_put(owner_path($uuid), json_encode($owner, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            // #labpay へ「誰が誰に依頼したか」を報告（pr内依頼のみ）
+            $reqName = trim((string)($me['name'] ?? $me['user'] ?? '')); if ($reqName === '') $reqName = '依頼者';
+            $revNames = implode('・', array_values(array_map(fn($r) => $r['name'] ?? '', $reviewers)));
+            $docTitle = trim((string)($owner['title'] ?? '')); if ($docTitle === '') $docTitle = '(無題のPDF)';
+            slack_notify("📨 {$reqName} さんが {$revNames} さんに原稿「{$docTitle}」のチェックを依頼しました");
             echo json_encode(['status' => 'success', 'uuid' => $uuid, 'count' => count($reviewers)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             exit;
         }
@@ -459,6 +548,11 @@ if ($method === 'POST') {
             $o['review_request']['reviewers'][$meUser]['result_uuid'] = $result;
             $o['review_request']['reviewers'][$meUser]['at'] = gmdate('c');
             meta_put(owner_path($uuid), json_encode($o, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            // #labpay へ「誰が誰の原稿を完了したか」を報告（pr内依頼のみ）
+            $reqName = trim((string)($o['name'] ?? '')); if ($reqName === '') $reqName = '依頼者';
+            $revName = trim((string)($me['name'] ?? $me['user'] ?? '')); if ($revName === '') $revName = 'レビュアー';
+            $docTitle = trim((string)($o['title'] ?? '')); if ($docTitle === '') $docTitle = '(無題のPDF)';
+            slack_notify("✅ {$revName} さんが {$reqName} さんの原稿「{$docTitle}」をチェックしました\nhttps://pr.nkmr.io/{$result}");
             echo json_encode(['status' => 'success']);
             exit;
         }
@@ -552,6 +646,33 @@ if ($method === 'POST') {
             ];
             meta_put(inreview_dir() . $key . '.json', json_encode($task, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
             echo json_encode(['status' => 'success', 'key' => $key], JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        // ---- 1h) AI査読生成（{action:'ai_review', uuid, force?}）＝研究室ログイン限定 ----
+        //   原稿PDFを pdftotext で抽出→OpenAIで構造化レビュー。meta/{uuid}.review.json にキャッシュ。
+        if (($input['action'] ?? '') === 'ai_review') {
+            $uuid = $input['uuid'] ?? '';
+            if (!is_valid_uuid($uuid)) json_error('Invalid uuid');
+            $pdf = $targetDir . $uuid . '.pdf';
+            if (!is_file($pdf)) json_error('原稿が見つかりません', 404);
+            $cacheFile = meta_dir() . $uuid . '.review.json';
+            if (empty($input['force']) && is_file($cacheFile)) {
+                $cached = json_decode(@file_get_contents($cacheFile), true);
+                if (is_array($cached)) { echo json_encode(['status' => 'success', 'review' => $cached, 'cached' => true], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); exit; }
+            }
+            $text = pdf_to_text($pdf);
+            if ($text === '') json_error('PDFからテキストを抽出できませんでした（画像のみのPDFの可能性）', 422);
+            list($code, $body) = openai_review($text);
+            if ($code < 200 || $code >= 300) json_error('査読APIエラー(HTTP ' . $code . '): ' . mb_substr($body, 0, 200), 502);
+            $d = json_decode($body, true);
+            $content = $d['choices'][0]['message']['content'] ?? '';
+            $review = json_decode($content, true);
+            if (!is_array($review)) json_error('査読結果の解析に失敗しました', 502);
+            $review['generated'] = gmdate('c');
+            $review['by'] = $me['name'] ?? ($me['user'] ?? '');
+            meta_put($cacheFile, json_encode($review, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+            echo json_encode(['status' => 'success', 'review' => $review, 'cached' => false], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             exit;
         }
 
@@ -700,6 +821,20 @@ if ($method === 'GET' && ($_GET['action'] ?? '') === 'request_get') {
         'myStatus'    => $amReviewer ? ($rv['status'] ?? 'pending') : null,
         'myResult'    => $amReviewer ? ($rv['result_uuid'] ?? null) : null,
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+// ---- GET: AI査読のキャッシュを取得（?action=ai_review&uuid=）----
+if ($method === 'GET' && ($_GET['action'] ?? '') === 'ai_review') {
+    require_login();
+    $uuid = $_GET['uuid'] ?? '';
+    if (!is_valid_uuid($uuid)) json_error('Invalid uuid');
+    $cacheFile = meta_dir() . $uuid . '.review.json';
+    if (is_file($cacheFile)) {
+        $cached = json_decode(@file_get_contents($cacheFile), true);
+        if (is_array($cached)) { echo json_encode(['status' => 'success', 'has' => true, 'review' => $cached], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); exit; }
+    }
+    echo json_encode(['status' => 'success', 'has' => false], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
