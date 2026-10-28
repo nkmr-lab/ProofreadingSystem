@@ -317,6 +317,37 @@ body.is-phone #inputModeBox{ display:none !important; }
 }
 .cap-x{ color:var(--ink); font-size:14px; }
 
+/* ===== AI査読パネル（文字起こしの隣に表示） ===== */
+#reviewPanel{
+  position:fixed;
+  left:0; right:0; bottom:0;
+  max-height:52vh;
+  display:flex;
+  flex-direction:column;
+  background:var(--surface);
+  border-top:1px solid var(--border);
+  box-shadow:0 -8px 24px rgba(16,24,40,.14);
+  z-index:51;
+}
+#reviewBody{ overflow-y:auto; padding:10px 14px 16px; -webkit-overflow-scrolling:touch; }
+.rv-judge{ display:inline-block; font-weight:700; font-size:14px; padding:4px 12px; border-radius:var(--radius-pill); margin:4px 0 10px; }
+.rv-ok{ background:#def7ec; color:#03543f; }
+.rv-warn{ background:#fdf6b2; color:#723b13; }
+.rv-bad{ background:#fde8e8; color:#9b1c1c; }
+.rv-sec{ margin:0 0 12px; }
+.rv-sec h4{ margin:0 0 5px; font-size:13px; color:var(--muted); font-weight:700; }
+.rv-text{ font-size:14px; line-height:1.7; color:var(--ink); }
+.rv-sec ul{ margin:0; padding-left:1.2em; }
+.rv-sec li{ font-size:14px; line-height:1.7; margin:2px 0; }
+.rv-chk{ font-size:13px; line-height:1.65; margin:4px 0; padding:6px 10px; background:#f7f8fa; border:1px solid var(--border); border-radius:8px; }
+.rv-chk b{ color:var(--accent); }
+.rv-meta{ margin-top:10px; font-size:11px; color:var(--muted); }
+/* 両方開いたら、広い画面では左右に並べる（＝文字起こしの隣） */
+@media (min-width:900px){
+  body.t-open.r-open #transcriptPanel{ right:50%; }
+  body.t-open.r-open #reviewPanel{ left:50%; }
+}
+
 /* ===== 補助クラス ===== */
 .hidden-file-input{ display:none; }
 .hidden{ display:none; }

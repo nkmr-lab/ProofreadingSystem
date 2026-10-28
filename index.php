@@ -39,8 +39,9 @@ $logoutUrl = nkmrauth_logout_url();
 </div>
 
 <button id="skipSilence" class="btn speedBtn" title="喋っていない区間を自動で飛ばす" style="display:none;">⏭️ 無音スキップ</button>
-<?php if ($me): // 文字起こしは研究室ログイン限定 ?>
+<?php if ($me): // 文字起こし・AI査読は研究室ログイン限定 ?>
 <button id="genTranscript" class="btn btn--secondary" style="display:none;">📝 文字起こし</button>
+<button id="genReview" class="btn btn--secondary" style="display:none;">🧐 AI査読</button>
 <?php endif; ?>
 
 <input type="file" id="file-input" class="hidden-file-input" />
@@ -120,6 +121,16 @@ $logoutUrl = nkmrauth_logout_url();
     </span>
   </div>
   <div id="transcriptList"></div>
+</div>
+<div id="reviewPanel" style="display:none;">
+  <div class="transcript-head">
+    <span>🧐 AI査読（査読プロンプトによる自動レビュー）</span>
+    <span style="display:flex; gap:6px;">
+      <button id="reviewRegen" class="btn btn--icon" title="査読をやり直す">🔄</button>
+      <button id="reviewClose" class="btn btn--icon" title="閉じる">✕</button>
+    </span>
+  </div>
+  <div id="reviewBody"></div>
 </div>
 <?php endif; ?>
 

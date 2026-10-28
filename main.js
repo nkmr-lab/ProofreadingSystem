@@ -10,6 +10,7 @@ import { startRecordingOnServer, startRecordingOnLocal, stopRecording, togglePau
 import { initViewport, attachViewportGestures } from './viewportHandler.js';
 import { loadSkipSetting, bindSkipSilenceUI } from './silenceHandler.js';
 import { initTranscriptUI } from './transcriptHandler.js';
+import { initReviewUI } from './reviewHandler.js';
 import { loadMyHistory, bindHistoryReload } from './historyHandler.js';
 import { openShareDialog } from './shareHandler.js';
 import { hud, hudEnabled } from './debugHud.js';
@@ -102,6 +103,7 @@ bindSkipSilenceUI();
 
 // 文字起こし（研究室ログイン限定・閲覧ページ）
 initTranscriptUI();
+initReviewUI();
 
 // /?req=<uuid>（pr内の依頼）・/?mr=<key>（LabPay作業中）はチェック(録音)モードで開く。
 // uuid抽出より先に判定（?req内のuuidをviewer扱いしない）。

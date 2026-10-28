@@ -5,6 +5,7 @@ import { getUploadedPDFFile, setUploadedPDFFile, loadPDF, loadAnnotations } from
 import { setAudioSourceOrFallback } from './audioHandler.js';
 import { loadSilenceProfile, attachSilenceSkip } from './silenceHandler.js';
 import { loadTranscript } from './transcriptHandler.js';
+import { loadReview } from './reviewHandler.js';
 import { appState } from './appState.js';
 import { getLocalTimeString } from './subModule.js';
 
@@ -63,6 +64,8 @@ export async function loadDataFromServer(_uuid){
 
       // 文字起こし（ログイン限定）。未ログインなら transcribe.php が401→UIは出ない
       if (data.audio) loadTranscript(_uuid);
+      // AI査読（ログイン限定・原稿PDFが対象なので音声の有無に関係なく）。未ログインは401→UI出ない
+      loadReview(_uuid);
 
       updateButtons();
   })

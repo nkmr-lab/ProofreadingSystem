@@ -122,5 +122,5 @@ function highlight(){
   }
 }
 
-function showPanel(v){ if (panelEl) panelEl.style.display = v ? '' : 'none'; }
+function showPanel(v){ if (panelEl) panelEl.style.display = v ? '' : 'none'; document.body.classList.toggle('t-open', !!(v && panelEl)); }
 function togglePanel(){ if (panelEl) showPanel(panelEl.style.display === 'none'); }
