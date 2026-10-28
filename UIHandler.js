@@ -74,9 +74,11 @@ export function updateButtons() {
                 setHidden('recIndicator', false);
                 setDisabled('drawing-mode', false);
                 setHidden('homeButton', true);
+                setHidden('userMenu', true);     // 録音中はユーザーアイコン不要（音量・経過時間だけでよい）
                 setDisabled('undo', !(paths[appState.currentPageNum] != null && paths[appState.currentPageNum].length > 0));
             } else {
                 setHidden('homeButton', false);
+                setHidden('userMenu', false);    // 録音中以外はユーザーアイコンを表示
                 setDisabled('drawing-mode', true);
                 setDisabled('undo', true);
                 setHidden('recordStop', true);
