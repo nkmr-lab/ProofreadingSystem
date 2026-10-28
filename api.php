@@ -591,6 +591,23 @@ if ($method === 'POST') {
             exit;
         }
 
+        // ---- 1e'') 自分が出した依頼の取り下げ（{action:'request_cancel', uuid}）----
+        //   依頼者（＝原稿のアップロード者）だけが、その原稿の依頼ごと取り下げる（review_request を外す）。
+        if (($input['action'] ?? '') === 'request_cancel') {
+            $uuid = $input['uuid'] ?? '';
+            if (!is_valid_uuid($uuid)) json_error('Invalid uuid');
+            $o = read_owner($uuid);
+            if (!is_array($o)) json_error('依頼が見つかりません', 404);
+            $amOwner = strtolower(trim($me['email'] ?? '')) === strtolower(trim($o['email'] ?? '')) && ($o['email'] ?? '') !== '';
+            if (!$amOwner) json_error('依頼者のみ取り下げできます', 403);
+            if (isset($o['review_request'])) {
+                unset($o['review_request']);
+                meta_put(owner_path($uuid), json_encode($o, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            }
+            echo json_encode(['status' => 'success']);
+            exit;
+        }
+
         // ---- 1f) 作業中タスク完了（{action:'inreview_done', key}）＝結果返却後に一覧から消す ----
         if (($input['action'] ?? '') === 'inreview_done') {
             $key = (string)($input['key'] ?? '');

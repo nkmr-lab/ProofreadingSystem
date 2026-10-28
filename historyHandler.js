@@ -343,7 +343,32 @@ function renderRequestsOut(items){
       }
       return `<span class="req-chip pending">${escapeHtml(r.name)} ⏳</span>`;
     }).join('');
-    row.innerHTML = `<div class="hist-title">${escapeHtml(title)}</div><div class="req-chips">${chips}</div>`;
+    const info = document.createElement('div');
+    info.className = 'req-out-info';
+    info.innerHTML = `<div class="hist-title">${escapeHtml(title)}</div><div class="req-chips">${chips}</div>`;
+    row.appendChild(info);
+    // 🗑 取り下げ：自分が出した依頼をキャンセル（依頼者のみ）
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'hist-del';
+    del.title = '依頼を取り下げる';
+    del.setAttribute('aria-label', '依頼を取り下げる');
+    del.textContent = '🗑';
+    del.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!confirm(`「${title}」の依頼を取り下げます。よろしいですか？`)) return;
+      del.disabled = true;
+      try {
+        await apiPost({ action: 'request_cancel', uuid: it.uuid });
+        row.remove();
+        if (!list.querySelector('.req-out-row')) box.style.display = 'none';
+      } catch (err) {
+        del.disabled = false;
+        alert(err?.message || '取り下げに失敗しました');
+      }
+    });
+    row.appendChild(del);
     list.appendChild(row);
   }
   box.style.display = '';
