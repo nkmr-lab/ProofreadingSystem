@@ -69,6 +69,9 @@ function makeRow(it, deletable = false){
     redoItem.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
+      pop.hidden = true;
+      mbtn.setAttribute('aria-expanded', 'false');
+      if (!confirm(`「${title}」をもう一度チェックします（録音し直し）。よろしいですか？`)) return;
       location.assign('/?recheck=' + encodeURIComponent(it.uuid));
     });
 
