@@ -62,8 +62,9 @@ export function updateButtons() {
             setHidden('zipControls', true);
             if( appState.isRecording ){
                 setHidden('reqBanner', true);   // 録音開始したら依頼バナーを隠す（邪魔・誤タップ防止）
-                if( appState.recordTarget === 'server') setHidden('recordLocal', true);
-                if( appState.recordTarget === 'local') setHidden('recordServer', true);
+                // 録音中は「録音開始」ボタン(サーバ/ローカル)は不要＝隠す（録音終了ボタンとインジケータがある）。
+                setHidden('recordServer', true);
+                setHidden('recordLocal', true);
                 setDisabled('recordServer', true);
                 setDisabled('recordLocal', true);
                 setHidden('recordStop', false);
@@ -89,6 +90,9 @@ export function updateButtons() {
                 'blink',
                 loggedIn && !appState.isRecording && !!(appState.reqUuid || appState.mrKey)
             );
+            // 録音終了ボタンも録音中はふわふわ（開始ボタンと同じく「押せる」合図）
+            const stopB = document.getElementById('recordStop');
+            if (stopB) stopB.classList.toggle('blink', appState.isRecording);
         } else {
             document.body.style.overflow = "auto";
             setHidden('description', false);

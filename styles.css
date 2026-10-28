@@ -103,8 +103,15 @@ button:focus-visible, .btn:focus-visible{ outline:2px solid var(--accent); outli
   60%  { box-shadow: 0 0 0 12px rgba(79,70,229,0); opacity:.78; }
   100% { box-shadow: 0 0 0 0 rgba(79,70,229,0); opacity:1; }
 }
+/* 録音終了ボタンも録音中はふわふわさせる（赤系・やわらかめ） */
+.btn--danger.blink{ animation: recPulseStop 1.6s ease-in-out infinite; }
+@keyframes recPulseStop {
+  0%,100% { box-shadow: 0 0 0 0 rgba(224,36,36,.5); opacity:1; }
+  50%     { box-shadow: 0 0 0 9px rgba(224,36,36,0); opacity:.7; }
+}
 @media (prefers-reduced-motion: reduce){
   .btn--record.blink{ animation:none; box-shadow:0 0 0 3px rgba(79,70,229,.45); }
+  .btn--danger.blink{ animation:none; box-shadow:0 0 0 3px rgba(224,36,36,.4); }
 }
 .btn--danger{ background:var(--danger); border-color:var(--danger); color:#fff; }
 .btn--danger:hover:not(:disabled){ background:var(--danger-hover); }
