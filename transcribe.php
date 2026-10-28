@@ -79,6 +79,97 @@ function respond_from_raw($raw, $me) {
         'lang'     => $raw['language'] ?? 'ja',
         'segments' => filter_segments($raw),
         'by'       => $me['email'] ?? '',
+        'engine'   => 'whisper',
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+// ===== 案C ハイブリッド：whisperのセグメント時刻 ＋ gpt-4o-transcribe の高精度本文 =====
+// セグメントごとにローカルアライメント（線形）で gpt 本文を割り当てる。長尺でもメモリ安全。
+// whisperの幻聴セグメント（「ご視聴ありがとう」「反復」等）は gpt 本文に対応が無く空になる→落ちる。
+
+// Ws（whisperセグメントの文字列）を win（gptの窓）の先頭から整列し、Wsを全消費したときの
+// 窓側の最良終端インデックスを返す（match+2/mismatch-1/gap-1、窓の末尾ギャップは無料）。
+function local_align_end($Ws, $win) {
+    $L = count($Ws); $M = count($win);
+    if ($L === 0 || $M === 0) return 0;
+    $prev = [];
+    for ($j = 0; $j <= $M; $j++) $prev[$j] = -$j;      // dp[0][j]：Ws未消費で窓をj個スキップ
+    for ($i = 1; $i <= $L; $i++) {
+        $cur = [0 => -$i];
+        $wi = $Ws[$i-1];
+        for ($j = 1; $j <= $M; $j++) {
+            $s = ($wi === $win[$j-1]) ? 2 : -1;
+            $diag = $prev[$j-1] + $s;
+            $up   = $prev[$j] - 1;
+            $left = $cur[$j-1] - 1;
+            $mx = $diag; if ($up > $mx) $mx = $up; if ($left > $mx) $mx = $left;
+            $cur[$j] = $mx;
+        }
+        $prev = $cur;
+    }
+    $best = $prev[0]; $bj = 0;
+    for ($j = 1; $j <= $M; $j++) { if ($prev[$j] >= $best) { $best = $prev[$j]; $bj = $j; } }
+    return $bj;
+}
+
+function build_hybrid($raw, $gptText) {
+    $segs = $raw['segments'] ?? [];
+    $Gall = preg_split('//u', (string)$gptText, -1, PREG_SPLIT_NO_EMPTY);
+    $G = count($Gall);
+    if ($G === 0) return [];
+
+    // (1) 各 gpt 文字に whisper セグメント由来の時刻を割り当てる（セグメント単位ローカル整列）
+    $charTime = array_fill(0, $G, 0.0);
+    $gpos = 0; $ns = count($segs); $lastT = 0.0;
+    foreach ($segs as $idx => $sg) {
+        if ($gpos >= $G) break;
+        $wtext = preg_replace('/\s+/u', '', (string)($sg['text'] ?? ''));
+        $Ws = preg_split('//u', $wtext, -1, PREG_SPLIT_NO_EMPTY);
+        $L = count($Ws);
+        if ($L === 0) continue;
+        $isLast = ($idx === $ns - 1);
+        $wlen = $isLast ? ($G - $gpos) : min($G - $gpos, $L * 2 + 40);
+        $win = array_slice($Gall, $gpos, $wlen);
+        $j = local_align_end($Ws, $win);
+        $t = round((float)($sg['start'] ?? 0), 2);
+        for ($k = $gpos; $k < $gpos + $j; $k++) $charTime[$k] = $t;
+        $gpos += $j;
+        $lastT = $t;
+    }
+    for ($k = $gpos; $k < $G; $k++) $charTime[$k] = $lastT;   // 余り
+    // 時刻を単調増加に補正（整列のゆらぎで前後しても戻さない）
+    $mx = 0.0;
+    for ($k = 0; $k < $G; $k++) { if ($charTime[$k] < $mx) $charTime[$k] = $mx; else $mx = $charTime[$k]; }
+
+    // (2) gpt 本文を文単位で区切る（単語途中で切らない）。長すぎる文は読点でも分ける。
+    $out = [];
+    $buf = ''; $bufStart = null; $bufEnd = 0.0;
+    for ($k = 0; $k < $G; $k++) {
+        $ch = $Gall[$k];
+        if ($bufStart === null) $bufStart = $charTime[$k];
+        $buf .= $ch;
+        $bufEnd = $charTime[$k];
+        $isEnd  = preg_match('/[。！？!?\n]/u', $ch);
+        $soft   = (mb_strlen($buf) >= 60 && preg_match('/[、]/u', $ch));
+        if ($isEnd || $soft) {
+            $t = trim($buf);
+            if ($t !== '') $out[] = ['start' => $bufStart, 'end' => $bufEnd, 'text' => $t];
+            $buf = ''; $bufStart = null;
+        }
+    }
+    if (trim($buf) !== '') $out[] = ['start' => $bufStart ?? $lastT, 'end' => $bufEnd, 'text' => trim($buf)];
+    return $out;
+}
+
+function respond_from_hybrid($raw, $gptText, $me) {
+    echo json_encode([
+        'status'   => 'success',
+        'has'      => true,
+        'lang'     => $raw['language'] ?? 'ja',
+        'segments' => build_hybrid($raw, $gptText),
+        'by'       => $me['email'] ?? '',
+        'engine'   => 'hybrid',
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
@@ -104,13 +195,16 @@ if (!empty($recips) && $restricted) {
     if (!$isOwner && !in_array($me['user'] ?? '', $recips, true)) j_err('閲覧権限がありません', 403);
 }
 
-$rawFile = $metaDir . $uuid . '.whisper.json';   // 生API応答のキャッシュ
+$rawFile = $metaDir . $uuid . '.whisper.json';   // whisper 生応答のキャッシュ（時刻用）
+$gptFile = $metaDir . $uuid . '.gpt.json';       // gpt-4o-transcribe 本文のキャッシュ（本文用）
 
-// ---- GET: 既存があれば間引いて返す ----
+// ---- GET: 既存があれば返す（両方あればハイブリッド、whisperのみなら旧方式）----
 if ($method === 'GET') {
     if (is_file($rawFile)) {
         $raw = json_decode(file_get_contents($rawFile), true);
-        if (is_array($raw)) respond_from_raw($raw, $me);
+        $gpt = is_file($gptFile) ? json_decode(file_get_contents($gptFile), true) : null;
+        if (is_array($raw) && is_array($gpt) && trim($gpt['text'] ?? '') !== '') respond_from_hybrid($raw, $gpt['text'], $me);
+        if (is_array($raw)) respond_from_raw($raw, $me);   // gpt未生成の旧キャッシュはwhisperで
     }
     echo json_encode(['status' => 'success', 'has' => false, 'segments' => []], JSON_UNESCAPED_UNICODE);
     exit;
@@ -121,6 +215,8 @@ if ($method === 'POST') {
     $force = !empty($_POST['force']);
     if (!$force && is_file($rawFile)) {
         $raw = json_decode(file_get_contents($rawFile), true);
+        $gpt = is_file($gptFile) ? json_decode(file_get_contents($gptFile), true) : null;
+        if (is_array($raw) && is_array($gpt) && trim($gpt['text'] ?? '') !== '') respond_from_hybrid($raw, $gpt['text'], $me);
         if (is_array($raw)) respond_from_raw($raw, $me);
     }
 
@@ -178,6 +274,25 @@ if ($method === 'POST') {
     $cerr = curl_error($ch);
     curl_close($ch);
 
+    // gpt-4o-transcribe（高精度本文）。whisperと同じ前処理音声を使う。失敗してもwhisperで続行。
+    $gch = curl_init('https://api.openai.com/v1/audio/transcriptions');
+    curl_setopt_array($gch, [
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $OPENAI_KEY],
+        CURLOPT_POSTFIELDS => [
+            'file'            => new CURLFile($sendPath, 'audio/mp4', $uuid . '.m4a'),
+            'model'           => 'gpt-4o-transcribe',
+            'response_format' => 'json',
+            'language'        => 'ja',
+            'prompt'          => $WHISPER_PROMPT,
+        ],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 300,
+    ]);
+    $gresp = curl_exec($gch);
+    $gcode = curl_getinfo($gch, CURLINFO_HTTP_CODE);
+    curl_close($gch);
+
     if ($tmpNorm && is_file($tmpNorm)) @unlink($tmpNorm);   // 正規化一時ファイルを掃除
 
     if ($resp === false) j_err('OpenAI接続に失敗: ' . $cerr, 502);
@@ -186,11 +301,28 @@ if ($method === 'POST') {
     $raw = json_decode($resp, true);
     if (!is_array($raw)) j_err('APIレスポンスの解析に失敗', 502);
 
-    // 一時ファイル→rename（meta/は777, CLI/apacheの所有者混在でも置換可）
+    // whisper 生応答をキャッシュ（時刻用）
     $tmp = $rawFile . '.tmp' . getmypid();
     if (@file_put_contents($tmp, json_encode($raw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX) !== false) {
         if (!@rename($tmp, $rawFile)) @unlink($tmp);
     }
+
+    // gpt 本文を取り出してキャッシュ（成功時）。幻聴に強い高精度本文。
+    $gptText = '';
+    if ($gcode >= 200 && $gcode < 300) {
+        $gd = json_decode((string)$gresp, true);
+        if (is_array($gd)) $gptText = trim((string)($gd['text'] ?? ''));
+    }
+    if ($gptText !== '') {
+        $gtmp = $gptFile . '.tmp' . getmypid();
+        $gpayload = json_encode(['text' => $gptText, 'model' => 'gpt-4o-transcribe', 'generated' => gmdate('c')], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if (@file_put_contents($gtmp, $gpayload, LOCK_EX) !== false) {
+            if (!@rename($gtmp, $gptFile)) @unlink($gtmp);
+        }
+        respond_from_hybrid($raw, $gptText, $me);   // 案C：高精度本文＋whisper時刻
+    }
+
+    // gpt が失敗したら whisper だけで返す（従来動作のフォールバック）
     respond_from_raw($raw, $me);
 }
 
