@@ -44,6 +44,22 @@ export function updateButtons() {
             setDashboardHidden(true);   // 録音/チェック中はダッシュボードを隠す
             setHidden('description', true);
             setHidden('pdf-container', false);
+
+            // 閲覧のみ（被依頼者でない研究室メンバーが依頼原稿を開いた）：
+            // 原稿PDFを読む＋ページ送り＋拡大だけ。録音・手書き・保存系は一切出さない。
+            if (appState.viewOnly){
+                ['recordServer','recordLocal','loginServerBtn','drawing-mode','undo',
+                 'recordStop','recordPause','recIndicator','zipControls','reqBanner'].forEach(id => setHidden(id, true));
+                setHidden('prev-page', false);
+                setHidden('next-page', false);
+                setDisabled('prev-page', appState.currentPageNum <= 1);
+                setDisabled('next-page', appState.currentPageNum >= pdfDoc.numPages);
+                setHidden('homeButton', false);
+                setHidden('userMenu', false);
+                const rec0 = document.getElementById('recordServer');
+                if (rec0) rec0.classList.remove('blink');
+                return;
+            }
             // ログイン中はサーバ蓄積に一本化（サーバー録音のみ）。
             // 未ログイン/外部はローカル録音のみ＋ログイン誘導ボタン。
             const loggedIn = !!appState.loggedIn;

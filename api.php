@@ -838,7 +838,8 @@ if ($method === 'GET' && ($_GET['action'] ?? '') === 'request_get') {
     $amRequester = ($meEmail !== '' && strtolower(trim($o['email'] ?? '')) === $meEmail);
     $rv = $o['review_request']['reviewers'][$me['user'] ?? ''] ?? null;
     $amReviewer = is_array($rv);
-    if (!$amRequester && !$amReviewer) json_error('この依頼の閲覧権限がありません', 403);
+    // 研究室ログイン済みなら誰でも原稿を閲覧できる（require_loginは通過済み）。
+    // チェック(録音して保存)できるのは被依頼者のみ＝canCheck。
     if (!is_file($targetDir . $uuid . '.pdf')) json_error('原稿が見つかりません', 404);
     echo json_encode([
         'status'      => 'success',
@@ -849,6 +850,7 @@ if ($method === 'GET' && ($_GET['action'] ?? '') === 'request_get') {
         'pdf'         => 'files/' . $uuid . '.pdf',
         'amRequester' => $amRequester,
         'amReviewer'  => $amReviewer,
+        'canCheck'    => $amReviewer,   // 被依頼者だけがチェック可。他は閲覧のみ
         'myStatus'    => $amReviewer ? ($rv['status'] ?? 'pending') : null,
         'myResult'    => $amReviewer ? ($rv['result_uuid'] ?? null) : null,
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

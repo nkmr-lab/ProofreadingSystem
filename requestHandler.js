@@ -148,7 +148,14 @@ export async function loadRequestForCheck(reqUuid){
     const title = (data.title && data.title.trim()) ? data.title : 'document.pdf';
     loadPdfFile(new File([blob], title.endsWith('.pdf') ? title : title + '.pdf', { type: 'application/pdf' }));
 
-    appState.reqUuid = reqUuid;
+    // 被依頼者だけがチェック(録音保存)可。それ以外の研究室メンバーは閲覧のみ。
+    if (data.canCheck){
+      appState.reqUuid = reqUuid;        // 保存時に request_done で紐づく
+      appState.viewOnly = false;
+    } else {
+      appState.reqUuid = null;           // 保存系は動かさない
+      appState.viewOnly = true;          // 録音/手書きボタンを出さない（UIHandler）
+    }
     // 「〜さんからの依頼」上部バナーは出さない（依頼主・日時・サイズはホーム一覧に表示）。
   } catch (e) {
     console.error(e);

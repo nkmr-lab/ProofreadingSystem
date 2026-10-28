@@ -11,6 +11,7 @@ import { resetView } from './viewportHandler.js';
 import { hud } from './debugHud.js';
 
 export async function startRecordingOnServer(){
+  if (appState.viewOnly) return;   // 閲覧のみ（被依頼者でない）＝録音不可
   // 押した瞬間に処理中フラグを立て、二度押し（反応待ちの再クリック）を無視する。
   if (appState.isBusy || appState.isRecording) return;
   appState.isBusy = true;
@@ -48,6 +49,7 @@ export async function startRecordingOnServer(){
 }
 
 export async function startRecordingOnLocal(){
+  if (appState.viewOnly) return;   // 閲覧のみ＝録音不可
   if (appState.isBusy || appState.isRecording) return;
   appState.isBusy = true;
   const btn = document.getElementById('recordLocal');
