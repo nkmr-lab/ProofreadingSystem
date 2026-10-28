@@ -157,6 +157,22 @@ export async function loadRequestForCheck(reqUuid){
   }
 }
 
+// ===== 履歴からのやり直し：/?recheck=<uuid> で、その原稿をもう一度チェックモードで開く =====
+// 保存時は新規の校正として作られる（元の履歴は残る。不要なら履歴の🗑で消す）。
+export async function loadReviewForRecheck(uuid){
+  try {
+    const pres = await fetch('files/' + encodeURIComponent(uuid) + '.pdf');
+    if (!pres.ok) throw new Error('PDF ' + pres.status);
+    const blob = await pres.blob();
+    loadPdfFile(new File([blob], 'document.pdf', { type: 'application/pdf' }));
+    // req/mr の紐付けはしない（単独の再チェック）。appState.uuid=null のまま＝保存時に新UUIDで作成。
+  } catch (e) {
+    console.error(e);
+    alert('原稿の取得に失敗しました: ' + (e.message || e));
+    location.assign('/');
+  }
+}
+
 // ===== LabPay作業中タスク(Phase2)：/?mr=<key> で原稿をチェックモードで開く =====
 export async function loadInReviewForCheck(key){
   try {

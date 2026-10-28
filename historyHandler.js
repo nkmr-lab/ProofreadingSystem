@@ -45,6 +45,20 @@ function makeRow(it, deletable = false){
     `<span class="hist-meta">${it.hasAudio ? '🎙️ ' : ''}${who}${escapeHtml(fmtDate(it.created))}</span>`;
   row.appendChild(a);
   if (deletable){
+    // 🔁 やり直す：同じ原稿をもう一度チェック（新規録音）。元の履歴は残る。
+    const redo = document.createElement('button');
+    redo.type = 'button';
+    redo.className = 'hist-redo';
+    redo.title = 'やり直す（もう一度チェック）';
+    redo.setAttribute('aria-label', 'やり直す');
+    redo.textContent = '🔁';
+    redo.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      location.assign('/?recheck=' + encodeURIComponent(it.uuid));
+    });
+    row.appendChild(redo);
+
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'hist-del';

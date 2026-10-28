@@ -438,9 +438,10 @@ body.is-phone #inputModeBox{ display:none !important; }
 .req-text{ display:flex; flex-direction:column; min-width:0; gap:2px; }
 .req-text .hist-meta{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .hist-sub{ font-size:11px; opacity:.85; font-variant-numeric:tabular-nums; }
-.hist-del{ flex:0 0 auto; background:none; border:none; cursor:pointer; font-size:16px; line-height:1; padding:6px 8px; border-radius:8px; color:var(--muted); }
+.hist-del, .hist-redo{ flex:0 0 auto; background:none; border:none; cursor:pointer; font-size:16px; line-height:1; padding:6px 8px; border-radius:8px; color:var(--muted); }
 .hist-del:hover:not(:disabled){ background:#fde8e8; color:#c0392b; }
-.hist-del:disabled{ opacity:.5; cursor:default; }
+.hist-redo:hover:not(:disabled){ background:#e8eefd; }
+.hist-del:disabled, .hist-redo:disabled{ opacity:.5; cursor:default; }
 .hist-title{ font-weight:600; font-size:15px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .hist-meta{ flex:0 0 auto; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
 .hist-more{

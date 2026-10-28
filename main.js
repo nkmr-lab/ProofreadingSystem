@@ -13,7 +13,7 @@ import { initTranscriptUI } from './transcriptHandler.js';
 import { loadMyHistory, bindHistoryReload } from './historyHandler.js';
 import { openShareDialog } from './shareHandler.js';
 import { hud, hudEnabled } from './debugHud.js';
-import { initRequestUI, loadRequestForCheck, loadInReviewForCheck } from './requestHandler.js';
+import { initRequestUI, loadRequestForCheck, loadInReviewForCheck, loadReviewForRecheck } from './requestHandler.js';
 
 document.addEventListener('keydown', (event) => keydownEvent(event));
 
@@ -108,8 +108,13 @@ initTranscriptUI();
 const _params = new URLSearchParams(location.search);
 const _reqParam = _params.get('req');
 const _mrParam = _params.get('mr');
-appState.uuid = (_reqParam || _mrParam) ? null : extractUUID(window.location.href);
-if (_mrParam) {
+const _recheckParam = _params.get('recheck');
+appState.uuid = (_reqParam || _mrParam || _recheckParam) ? null : extractUUID(window.location.href);
+if (_recheckParam) {
+  appState.isCheckerMode = true;          // 履歴からやり直し＝その原稿をチェックモードで開く（新規保存）
+  initFileInputButton();
+  await loadReviewForRecheck(_recheckParam);
+} else if (_mrParam) {
   appState.isCheckerMode = true;          // LabPay依頼の原稿をチェックモードで開く
   initFileInputButton();
   await loadInReviewForCheck(_mrParam);   // 保存時に result_callback 返却＋inreview_done
