@@ -255,45 +255,45 @@ export function attachPointerDrawing(_pdfSVG){
   _pdfSVG.__ptr = { onDown, onMove, onUp: finish };
 }
 
-// ===== Pen ON / Touch OFF 時の、指での端スワイプによるページめくり =====
+// ===== Pen ON / Touch OFF 時の、指の横スワイプによるページめくり（画面のどこでもOK）=====
 // タッチを手書きに使わない設定(inputMode.touch===false)のとき、指は描画に使わない代わりに
-//  ・画面右1/5から始めた左スワイプ → 次ページ
-//  ・画面左1/5から始めた右スワイプ → 前ページ
-// にする。2本指(ピンチ/パン)は viewport 側に任せるため、単指のときだけ扱う。
+//  ・右から左へスワイプ → 次ページ / 左から右へスワイプ → 前ページ（画面端でなくてよい）
+// 単指のときだけ扱う（2本指ピンチ/パンは viewport 側）。
+// ★ペン筆記中(＋直後GRACE)は無効＝手のひらのドリフトで勝手にページが飛んで書きかけが
+//   消えるのを防ぐ。遅い動き(手のひら)も MAX_MS で弾く。
 export function attachEdgeSwipeNav(svg){
   if (!svg || svg.__edgeSwipe) return;
   svg.__edgeSwipe = true;
 
-  const EDGE_FRAC = 1 / 5;    // 端とみなす幅（画面幅に対する割合）
-  const MIN_DX = 60;          // ページめくりとみなす最小の横移動(px)
-  const OFF_AXIS = 0.8;       // |dy| <= |dx|*0.8 ＝ ほぼ水平なら有効
+  const MIN_DX = 70;          // ページめくりとみなす最小の横移動(px)
+  const OFF_AXIS = 0.7;       // |dy| <= |dx|*0.7 ＝ ほぼ水平なら有効
+  const MAX_MS = 700;         // これより遅いスワイプは無視（手のひらのドリフト対策）
 
-  let active = null;          // {id, x0, y0}
+  let active = null;          // {id, x0, y0, t0}
   let touchCount = 0;
 
   const usable = () => appState.isCheckerMode && !appState.inputMode.touch && !!pdfDoc;
+  const penActive = () => performance.now() < (appState.penActiveUntil || 0);
 
   svg.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'touch') return;
     touchCount++;
-    if (!usable() || touchCount > 1) { active = null; return; }   // タッチ描画ON or 2本指は対象外
-    active = { id: e.pointerId, x0: e.clientX, y0: e.clientY };
+    if (!usable() || penActive() || touchCount > 1) { active = null; return; }  // 描画ON/ペン筆記中/2本指は対象外
+    active = { id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now() };
   }, { passive: true });
 
   const endTrack = (e) => {
     if (e.pointerType === 'touch') touchCount = Math.max(0, touchCount - 1);
     if (!active || e.pointerId !== active.id) return;
     const a = active; active = null;
-    if (!usable() || touchCount > 0) return;                       // 指が残る＝複数指ジェスチャ
+    if (!usable() || penActive() || touchCount > 0) return;        // ペン筆記中/指が残る＝対象外
+    if (performance.now() - a.t0 > MAX_MS) return;                 // 遅い＝スワイプでない（手のひら）
     const dx = e.clientX - a.x0;
     const dy = e.clientY - a.y0;
     if (Math.abs(dx) < MIN_DX) return;
     if (Math.abs(dy) > Math.abs(dx) * OFF_AXIS) return;            // 縦が大きい＝ページめくりでない
-    const W = window.innerWidth || document.documentElement.clientWidth || 1;
-    const fromRight = a.x0 >= W * (1 - EDGE_FRAC);
-    const fromLeft  = a.x0 <= W * EDGE_FRAC;
-    if (fromRight && dx < 0) changePage(1);        // 右端から左へ → 次ページ
-    else if (fromLeft && dx > 0) changePage(-1);   // 左端から右へ → 前ページ
+    if (dx < 0) { hud('SWIPE next'); changePage(1); }             // 右→左 ＝ 次ページ
+    else        { hud('SWIPE prev'); changePage(-1); }            // 左→右 ＝ 前ページ
   };
   svg.addEventListener('pointerup', endTrack, { passive: true });
   svg.addEventListener('pointercancel', endTrack, { passive: true });
