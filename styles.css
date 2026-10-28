@@ -421,6 +421,8 @@ body.is-phone #inputModeBox{ display:none !important; }
   transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;
 }
 .hist-row:hover{ transform:translateY(-1px); box-shadow:var(--shadow-sm); border-color:var(--accent); background:#eef2ff; }
+/* 「もっと見る」で畳む行。.hist-row{display:flex} が [hidden] を上書きして畳めなかったのを修正 */
+.hist-row[hidden]{ display:none !important; }
 /* 行内のリンク部（タイトル＋メタ）。行末に🗑ボタンを置けるよう、リンクと削除を分けた。 */
 .hist-link{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex:1 1 auto; min-width:0; text-decoration:none; color:inherit; }
 /* 届いた依頼の行：依頼主アイコン＋（タイトル／名前）を左寄せで並べる */
