@@ -288,23 +288,25 @@ function read_openai_key() {
     return '';
 }
 
-// pr内依頼のイベント（依頼作成/チェック完了）を LabPay に通知し、通知系（#labpay broadcast・Slack DM 等）へ連携する。
-// 送信先と共有シークレットは config.local.php の labpay_event_url / labpay_event_secret（未設定なら何もしない）。
-// サーバ間POSTなのでCORSの影響を受けない。best-effort（失敗しても本処理は止めない）。
+// pr内依頼のイベントを LabPay の汎用通知受け口 /api/incoming-notify へ送る（LabPay v1434）。
+// LabPay側で in-app通知／本人Slack DM／#labpay ブロードキャストを行う。
+// 送信先URLと Bearer シークレットは config.local.php の labpay_event_url / labpay_event_secret。
+// 未設定なら何もしない。サーバ間POSTでCORS無関係・best-effort（失敗しても本処理は止めない）。
 function notify_labpay($payload) {
     $cfg = __DIR__ . '/config.local.php';
     $url = ''; $secret = '';
     if (is_file($cfg)) { $c = require $cfg; if (is_array($c)) { $url = (string)($c['labpay_event_url'] ?? ''); $secret = (string)($c['labpay_event_secret'] ?? ''); } }
-    if ($url === '' || strtolower((string)parse_url($url, PHP_URL_HOST)) !== 'pay.nkmr.io') return;
-    $h = ['Content-Type: application/json', 'X-Requested-With: labpay'];
-    if ($secret !== '') $h[] = 'X-PR-Secret: ' . $secret;
+    if ($url === '' || $secret === '' || strtolower((string)parse_url($url, PHP_URL_HOST)) !== 'pay.nkmr.io') return;
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => $h,
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/json; charset=utf-8',
+            'Authorization: Bearer ' . $secret,
+        ],
         CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 6,
+        CURLOPT_TIMEOUT => 5,
         CURLOPT_CONNECTTIMEOUT => 4,
     ]);
     @curl_exec($ch);
@@ -525,16 +527,16 @@ if ($method === 'POST') {
                 'created'   => gmdate('c'),
             ];
             meta_put(owner_path($uuid), json_encode($owner, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
-            // 「誰が誰に依頼したか」を LabPay へ通知→LabPayの通知系(#labpay等)へ（pr内依頼のみ）
+            // 「誰が誰に依頼したか」を LabPay → #labpay へ（pr内依頼のみ）。
+            // レビュアーのメールは pr(SSO名簿) に無いため to_emails は空＝#labpay ブロードキャストのみ。本文にレビュアー名を入れる。
             $reqName = trim((string)($me['name'] ?? $me['user'] ?? '')); if ($reqName === '') $reqName = '依頼者';
+            $revNames = implode('・', array_values(array_map(fn($r) => $r['name'] ?? '', $reviewers)));
             $docTitle = trim((string)($owner['title'] ?? '')); if ($docTitle === '') $docTitle = '(無題のPDF)';
             notify_labpay([
-                'event'       => 'request_created',
-                'source'      => 'pr',
-                'requester'   => $reqName,
-                'reviewers'   => array_values(array_map(fn($r) => $r['name'] ?? '', $reviewers)),
-                'title'       => $docTitle,
-                'manuscript'  => "https://pr.nkmr.io/{$uuid}",
+                'source'        => 'pr.nkmr.io',
+                'to_emails'     => [],
+                'body'          => "📝 {$reqName} さんが {$revNames} さんに原稿チェックを依頼: 「{$docTitle}」\n→ https://pr.nkmr.io/{$uuid}",
+                'slack_channel' => '#labpay',
             ]);
             echo json_encode(['status' => 'success', 'uuid' => $uuid, 'count' => count($reviewers)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             exit;
@@ -554,17 +556,16 @@ if ($method === 'POST') {
             $o['review_request']['reviewers'][$meUser]['result_uuid'] = $result;
             $o['review_request']['reviewers'][$meUser]['at'] = gmdate('c');
             meta_put(owner_path($uuid), json_encode($o, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
-            // 「誰が誰の原稿を完了したか」を LabPay へ通知→LabPayの通知系(#labpay等)へ（pr内依頼のみ）
-            $reqName = trim((string)($o['name'] ?? '')); if ($reqName === '') $reqName = '依頼者';
-            $revName = trim((string)($me['name'] ?? $me['user'] ?? '')); if ($revName === '') $revName = 'レビュアー';
+            // 「誰が誰の原稿を完了したか」を LabPay → 依頼者本人へ(in-app/DM)＋#labpay へ（pr内依頼のみ）。
+            // 依頼者＝原稿所有者のメールは pr が持っているので to_emails に入れられる。
+            $reqEmail = trim((string)($o['email'] ?? ''));
+            $revName  = trim((string)($me['name'] ?? $me['user'] ?? '')); if ($revName === '') $revName = 'レビュアー';
             $docTitle = trim((string)($o['title'] ?? '')); if ($docTitle === '') $docTitle = '(無題のPDF)';
             notify_labpay([
-                'event'     => 'review_done',
-                'source'    => 'pr',
-                'reviewer'  => $revName,
-                'requester' => $reqName,
-                'title'     => $docTitle,
-                'resultUrl' => "https://pr.nkmr.io/{$result}",
+                'source'        => 'pr.nkmr.io',
+                'to_emails'     => ($reqEmail !== '' ? [$reqEmail] : []),
+                'body'          => "✅ {$revName} さんが原稿『{$docTitle}』をチェックしました\n→ https://pr.nkmr.io/{$result}",
+                'slack_channel' => '#labpay',
             ]);
             echo json_encode(['status' => 'success']);
             exit;
