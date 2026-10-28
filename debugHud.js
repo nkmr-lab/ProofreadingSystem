@@ -15,6 +15,10 @@ export function hudEnabled(){
   return on;
 }
 
+// 読み込み時に即判定＝?dbg=1 をイベント発生前に localStorage へ記憶させる
+// （以前は最初の描画イベントまで判定が走らず、ホームで付けても遷移で失効していた）。
+try { hudEnabled(); } catch {}
+
 export function hud(line){
   if (!hudEnabled()) return;
   try {

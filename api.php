@@ -495,6 +495,31 @@ if ($method === 'POST') {
             exit;
         }
 
+        // ---- 1f') LabPay結果コールバックのサーバ中継（{action:'review_callback', cb, cbt, resultUrl}）----
+        //   ブラウザから pay.nkmr.io へ直接POSTすると CORS で弾かれるため、pr のサーバから中継する。
+        if (($input['action'] ?? '') === 'review_callback') {
+            $cb = trim((string)($input['cb'] ?? ''));
+            $cbt = trim((string)($input['cbt'] ?? ''));
+            $resultUrl = trim((string)($input['resultUrl'] ?? ''));
+            if (strtolower((string)parse_url($cb, PHP_URL_HOST)) !== 'pay.nkmr.io') json_error('invalid cb host', 400);
+            if ($cbt === '' || $resultUrl === '') json_error('missing cbt/resultUrl', 400);
+            $ch = curl_init($cb);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'X-Requested-With: labpay'],
+                CURLOPT_POSTFIELDS => json_encode(['cbt' => $cbt, 'resultUrl' => $resultUrl], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_CONNECTTIMEOUT => 5,
+            ]);
+            $resp = curl_exec($ch);
+            $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err  = curl_error($ch);
+            curl_close($ch);
+            echo json_encode(['status' => 'success', 'code' => $code, 'err' => $err, 'resp' => mb_substr((string)$resp, 0, 300)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
         // ---- 1g) ハンドオフ自己登録（{action:'received_register', source_pdf_uuid, cb, cbt, title, src}）----
         //   LabPayの「校閲する」で pr に来た時点で、ログイン中の本人の被依頼として登録（シークレット不要）。
         if (($input['action'] ?? '') === 'received_register') {

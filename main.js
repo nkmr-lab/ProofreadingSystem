@@ -12,6 +12,7 @@ import { loadSkipSetting, bindSkipSilenceUI } from './silenceHandler.js';
 import { initTranscriptUI } from './transcriptHandler.js';
 import { loadMyHistory, bindHistoryReload } from './historyHandler.js';
 import { openShareDialog } from './shareHandler.js';
+import { hud, hudEnabled } from './debugHud.js';
 import { initRequestUI, loadRequestForCheck, loadInReviewForCheck } from './requestHandler.js';
 
 document.addEventListener('keydown', (event) => keydownEvent(event));
@@ -74,7 +75,17 @@ appState.isCheckerMode = document.getElementById('bodyContent')?.dataset?.checke
 const _pdfSVGEl = document.getElementById('pdfSVG');
 initViewport(_pdfSVGEl, document.getElementById('pdf-container'));
 attachViewportGestures(_pdfSVGEl);
-attachEdgeSwipeNav(_pdfSVGEl);   // Pen ON/Touch OFF 時、指の端スワイプでページめくり
+attachEdgeSwipeNav(_pdfSVGEl);   // Pen ON/Touch OFF 時、指の横スワイプでページめくり
+
+// デバッグHUD(?dbg=1)：起動を1行出し、SVGに届く生ポインタイベントを常時記録。
+// 描画が壊れている/リスナ未装着でも「イベントがSVGに届いているか」を切り分けられる。
+if (hudEnabled()) {
+  hud('HUD ready (dbg on). 描けない時のイベントを記録します');
+  const raw = (tag) => (e) => hud(`raw ${tag} ${e.pointerType} id=${e.pointerId} p=${(e.pressure||0).toFixed(2)} b=${e.buttons}`);
+  _pdfSVGEl.addEventListener('pointerdown', raw('DN'), { capture: true, passive: true });
+  _pdfSVGEl.addEventListener('pointerup',   raw('UP'), { capture: true, passive: true });
+  _pdfSVGEl.addEventListener('pointercancel', raw('CX'), { capture: true, passive: true });
+}
 
 loadInputSettings();
 syncStateFromCheckboxes();

@@ -8,6 +8,7 @@ import { setHidden, setDisabled } from './htmlHandler.js';
 import { getPdfBlob, exportLocalRecordingAsZip, saveAnnotations } from './storageHandler.js';
 import { DrawingMode } from './drawingHandler.js';
 import { resetView } from './viewportHandler.js';
+import { hud } from './debugHud.js';
 
 export async function startRecordingOnServer(){
   // 押した瞬間に処理中フラグを立て、二度押し（反応待ちの再クリック）を無視する。
@@ -193,17 +194,22 @@ async function extractTitleAsync(uuid){
 }
 
 // LabPay の「校閲する」経由なら、保存した校閲URLを元のタスク添付へ返却する。
+// ★ブラウザから pay.nkmr.io へ直接POSTすると CORS(プリフライト)で弾かれるため、
+//   pr のサーバ(api.php)経由で中継する(roster と同じCORS回避)。結果コードをHUDに出す。
 async function postReviewResult(resultUrl) {
   const rc = appState.reviewCb;
-  if (!rc?.cb || !rc?.cbt) return;
+  if (!rc?.cb || !rc?.cbt) { hud('cb: reviewCb無し(LabPay通知しない)'); return; }
   try {
-    await fetch(rc.cb, {
+    const r = await fetch('api.php', {
       method: 'POST',
-      // LabPay は状態変更POSTに X-Requested-With: labpay(CSRF対策)を要求する。
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'labpay' },
-      body: JSON.stringify({ cbt: rc.cbt, resultUrl }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'review_callback', cb: rc.cb, cbt: rc.cbt, resultUrl }),
     });
+    const d = await r.json().catch(() => ({}));
+    hud(`cb->LabPay http=${d.code ?? r.status} ${d.err ? ('err=' + d.err) : ''}`);
+    console.log('review_callback result', d);
   } catch (e) {
+    hud('cb->LabPay 送信失敗');
     console.warn('review result callback failed', e);
   }
 }
