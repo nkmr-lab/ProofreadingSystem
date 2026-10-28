@@ -953,6 +953,18 @@ if ($method === 'GET' && isset($_GET['uuid'])) {
         echo json_encode($resp, JSON_UNESCAPED_SLASHES);
         exit;
     }
+
+    // 校正JSONはまだ無いが PDF＋依頼(review_request)がある＝未チェックの依頼原稿。
+    // 研究室ログイン済みなら「原稿」として返す（クライアントは閲覧ビューへ委譲）。
+    if (file_exists($pdfFile)) {
+        $owner = read_owner($uuid);
+        if (is_array($owner) && isset($owner['review_request'])) {
+            $me = nkmrauth_identity();
+            if (!$me) json_error('この原稿は中村研アカウントでログインすると閲覧できます。', 403);
+            echo json_encode(['status' => 'success', 'manuscript' => true, 'uuid' => $uuid], JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+    }
     json_error('File not found', 404);
 }
 

@@ -6,6 +6,7 @@ import { setAudioSourceOrFallback } from './audioHandler.js';
 import { loadSilenceProfile, attachSilenceSkip } from './silenceHandler.js';
 import { loadTranscript } from './transcriptHandler.js';
 import { loadReview } from './reviewHandler.js';
+import { loadRequestForCheck } from './requestHandler.js';
 import { appState } from './appState.js';
 import { getLocalTimeString } from './subModule.js';
 
@@ -17,6 +18,14 @@ export async function loadDataFromServer(_uuid){
           // 限定公開で権限が無い等は、そのままメッセージを見せてトップへ誘導
           alert(data.message || '読み込みに失敗しました');
           location.assign('/');
+          return;
+      }
+
+      // 未チェックの依頼原稿（校正JSONがまだ無い）＝原稿を閲覧ビューで開く（被依頼者ならチェック可）
+      if (data.manuscript) {
+          appState.isCheckerMode = true;
+          await loadRequestForCheck(_uuid);   // request_get→PDF読込・canCheckでviewOnly判定
+          updateButtons();
           return;
       }
 
