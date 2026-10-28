@@ -288,21 +288,21 @@ function read_openai_key() {
     return '';
 }
 
-// Slack Incoming Webhook（#labpay 等・サーバのみの config.local.php の slack_webhook）。未設定なら通知しない。
-function read_slack_webhook() {
+// pr内依頼のイベント（依頼作成/チェック完了）を LabPay に通知し、通知系（#labpay broadcast・Slack DM 等）へ連携する。
+// 送信先と共有シークレットは config.local.php の labpay_event_url / labpay_event_secret（未設定なら何もしない）。
+// サーバ間POSTなのでCORSの影響を受けない。best-effort（失敗しても本処理は止めない）。
+function notify_labpay($payload) {
     $cfg = __DIR__ . '/config.local.php';
-    if (is_file($cfg)) { $c = require $cfg; if (is_array($c)) return (string)($c['slack_webhook'] ?? ''); }
-    return '';
-}
-function slack_notify($text) {
-    $url = read_slack_webhook();
-    if ($url === '' || strpos($url, 'https://hooks.slack.com/') !== 0) return;
-    if ((string)$text === '') return;
+    $url = ''; $secret = '';
+    if (is_file($cfg)) { $c = require $cfg; if (is_array($c)) { $url = (string)($c['labpay_event_url'] ?? ''); $secret = (string)($c['labpay_event_secret'] ?? ''); } }
+    if ($url === '' || strtolower((string)parse_url($url, PHP_URL_HOST)) !== 'pay.nkmr.io') return;
+    $h = ['Content-Type: application/json', 'X-Requested-With: labpay'];
+    if ($secret !== '') $h[] = 'X-PR-Secret: ' . $secret;
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-        CURLOPT_POSTFIELDS => json_encode(['text' => (string)$text], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        CURLOPT_HTTPHEADER => $h,
+        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => 6,
         CURLOPT_CONNECTTIMEOUT => 4,
@@ -525,11 +525,17 @@ if ($method === 'POST') {
                 'created'   => gmdate('c'),
             ];
             meta_put(owner_path($uuid), json_encode($owner, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
-            // #labpay へ「誰が誰に依頼したか」を報告（pr内依頼のみ）
+            // 「誰が誰に依頼したか」を LabPay へ通知→LabPayの通知系(#labpay等)へ（pr内依頼のみ）
             $reqName = trim((string)($me['name'] ?? $me['user'] ?? '')); if ($reqName === '') $reqName = '依頼者';
-            $revNames = implode('・', array_values(array_map(fn($r) => $r['name'] ?? '', $reviewers)));
             $docTitle = trim((string)($owner['title'] ?? '')); if ($docTitle === '') $docTitle = '(無題のPDF)';
-            slack_notify("📨 {$reqName} さんが {$revNames} さんに原稿「{$docTitle}」のチェックを依頼しました");
+            notify_labpay([
+                'event'       => 'request_created',
+                'source'      => 'pr',
+                'requester'   => $reqName,
+                'reviewers'   => array_values(array_map(fn($r) => $r['name'] ?? '', $reviewers)),
+                'title'       => $docTitle,
+                'manuscript'  => "https://pr.nkmr.io/{$uuid}",
+            ]);
             echo json_encode(['status' => 'success', 'uuid' => $uuid, 'count' => count($reviewers)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             exit;
         }
@@ -548,11 +554,18 @@ if ($method === 'POST') {
             $o['review_request']['reviewers'][$meUser]['result_uuid'] = $result;
             $o['review_request']['reviewers'][$meUser]['at'] = gmdate('c');
             meta_put(owner_path($uuid), json_encode($o, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
-            // #labpay へ「誰が誰の原稿を完了したか」を報告（pr内依頼のみ）
+            // 「誰が誰の原稿を完了したか」を LabPay へ通知→LabPayの通知系(#labpay等)へ（pr内依頼のみ）
             $reqName = trim((string)($o['name'] ?? '')); if ($reqName === '') $reqName = '依頼者';
             $revName = trim((string)($me['name'] ?? $me['user'] ?? '')); if ($revName === '') $revName = 'レビュアー';
             $docTitle = trim((string)($o['title'] ?? '')); if ($docTitle === '') $docTitle = '(無題のPDF)';
-            slack_notify("✅ {$revName} さんが {$reqName} さんの原稿「{$docTitle}」をチェックしました\nhttps://pr.nkmr.io/{$result}");
+            notify_labpay([
+                'event'     => 'review_done',
+                'source'    => 'pr',
+                'reviewer'  => $revName,
+                'requester' => $reqName,
+                'title'     => $docTitle,
+                'resultUrl' => "https://pr.nkmr.io/{$result}",
+            ]);
             echo json_encode(['status' => 'success']);
             exit;
         }
