@@ -15,8 +15,8 @@ export function updateButtons() {
         setHidden('speedButtons', false);
         setHidden('audioPlayer', false);
         setHidden('skipSilence', false);   // 無音スキップは閲覧時のみ
-        setHidden('shareReview', false);   // 共有ボタンは閲覧時のみ
-        setHidden('downloadPdf', false);   // PDFダウンロードは閲覧時に出す
+        setHidden('shareReview', !appState.isOwner);   // 共有ボタンは作成者のみ（外部・非所有者には出さない）
+        setHidden('downloadPdf', false);   // PDFダウンロードは閲覧時に出す（共有された校正なのでDL可）
         setHidden('prev-page', true);
         setHidden('next-page', true);
         setHidden('drawing-mode', true);

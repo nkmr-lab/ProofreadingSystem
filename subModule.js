@@ -1,3 +1,19 @@
+// HTMLエスケープ（各モジュールで重複していたのを共通化）
+export function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// 研究室メンバー一覧（共有・依頼ピッカー用）。requestHandler/shareHandler で重複していたのを共通化。
+export const GRADE_ORDER = ['教員', 'D3', 'D2', 'D1', 'M2', 'M1', 'B4', 'B3', 'B2', 'B1'];
+let _rosterCache = null;
+export async function fetchRoster(){
+    if (_rosterCache) return _rosterCache;
+    const res = await fetch('api.php?action=roster');
+    const data = await res.json();
+    _rosterCache = (data.users || []).filter(u => u.user && u.user !== 'nkmrlab');
+    return _rosterCache;
+}
+
 export function calculateMedianPressure(_points) {
     if (!_points.length) return 0;
     const pressures = _points.map(point => point.pressure).sort((a, b) => a - b);

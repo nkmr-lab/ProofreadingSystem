@@ -1,6 +1,7 @@
 // transcriptHandler.js — OpenAI Whisper の文字起こしを同期字幕として表示（研究室ログイン限定）。
 // 行クリックでその時刻へジャンプ、再生中は現在行をハイライト＆自動スクロール。
 import { appState } from './appState.js';
+import { escapeHtml } from './subModule.js';
 
 let segments = [];
 let audioEl = null;
@@ -14,10 +15,6 @@ function fmt(t){
   const s = Math.max(0, Math.floor(t));
   return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
 }
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
 export function initTranscriptUI(){
   panelEl = document.getElementById('transcriptPanel');
   listEl  = document.getElementById('transcriptList');

@@ -3,23 +3,9 @@
 //  - 作成者のみ: 「みんなに公開」か「指定した人だけ」を選び、研究室メンバーから相手を選択
 // 相手は username（roster）で保持。api.php {action:'recipients'} に保存し、閲覧は api.php GET が制御。
 import { appState } from './appState.js';
+import { escapeHtml, GRADE_ORDER, fetchRoster } from './subModule.js';
 
-const GRADE_ORDER = ['教員', 'D3', 'D2', 'D1', 'M2', 'M1', 'B4', 'B3', 'B2', 'B1'];
-let rosterCache = null;
-
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
 function shareUrl(){ return location.origin + '/' + appState.uuid; }
-
-async function fetchRoster(){
-  if (rosterCache) return rosterCache;
-  const res = await fetch('api.php?action=roster');
-  const data = await res.json();
-  const users = (data.users || []).filter(u => u.user && u.user !== 'nkmrlab');
-  rosterCache = users;
-  return users;
-}
 
 export async function openShareDialog(){
   if (!appState.uuid) return;

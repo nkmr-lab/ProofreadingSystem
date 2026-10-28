@@ -2,13 +2,11 @@
 // 原稿PDFをサーバで pdftotext→gpt-4o に通し、構造化レビュー(要約/良い点/改善点/チェックリスト/総評/判定)を
 // 文字起こしの隣に表示する。api.php の ai_review(GET=キャッシュ取得 / POST=生成) を使う。
 import { appState } from './appState.js';
+import { escapeHtml } from './subModule.js';
 
 let panelEl = null, bodyEl = null, btnEl = null;
 let reviewData = null, loaded = false;
 
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
 function nl2br(s){ return escapeHtml(s).replace(/\n/g, '<br>'); }
 
 export function initReviewUI(){

@@ -1,9 +1,8 @@
 // historyHandler.js — ホームで「自分がチェックした校正」を新しい順に一覧（ログイン限定）。
 // api.php?action=mine（所有者=自分の meta を走査）から取得し、/{uuid} へのリンクを並べる。
 
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
+import { escapeHtml } from './subModule.js';
+
 // ISO文字列 → ローカルの読みやすい日時
 function fmtDate(iso){
   if (!iso) return '';

@@ -3,20 +3,7 @@
 //  レビュアー: /?req=<uuid> で原稿をチェック(録音)モードで開き、保存で結果が依頼に紐づく。
 import { appState } from './appState.js';
 import { loadPdfFile } from './pdfHandler.js';
-
-const GRADE_ORDER = ['教員', 'D3', 'D2', 'D1', 'M2', 'M1', 'B4', 'B3', 'B2', 'B1'];
-let rosterCache = null;
-
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-async function fetchRoster(){
-  if (rosterCache) return rosterCache;
-  const res = await fetch('api.php?action=roster');
-  const data = await res.json();
-  rosterCache = (data.users || []).filter(u => u.user && u.user !== 'nkmrlab');
-  return rosterCache;
-}
+import { escapeHtml, GRADE_ORDER, fetchRoster } from './subModule.js';
 
 // ===== 依頼者側：作成フロー =====
 export function initRequestUI(){
