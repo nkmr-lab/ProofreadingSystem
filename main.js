@@ -1,4 +1,4 @@
-import { changePage, loadPdfFile } from './pdfHandler.js';
+import { changePage, loadPdfFile, getUploadedPDFFile } from './pdfHandler.js';
 import { undoLast } from './drawingHandler.js';
 import { updateButtons, toggleDrawingMode, initFileInputButton } from './UIHandler.js';
 import { extractUUID } from './subModule.js';
@@ -35,6 +35,28 @@ document.getElementById('recordStop')?.addEventListener('click', stopRecording);
 document.getElementById('recordPause')?.addEventListener('click', togglePauseRecording);
 document.getElementById('deleteReview')?.addEventListener('click', () => deleteReviewFromServer(appState.uuid));
 document.getElementById('shareReview')?.addEventListener('click', openShareDialog);
+document.getElementById('downloadPdf')?.addEventListener('click', downloadCurrentPdf);
+
+// 表示中のPDFをダウンロード。読み込んだFile（チェック/原稿表示）を優先、無ければURL（ビューア）。
+function downloadCurrentPdf(){
+  const f = (typeof getUploadedPDFFile === 'function') ? getUploadedPDFFile() : null;
+  let href, name, revoke = false;
+  if (f){
+    href = URL.createObjectURL(f); revoke = true;
+    name = f.name || 'document.pdf';
+  } else if (appState.pdfUrl){
+    href = appState.pdfUrl;
+    name = (appState.pdfUrl.split('/').pop() || 'document.pdf');
+  } else {
+    alert('ダウンロードできるPDFがありません');
+    return;
+  }
+  if (!/\.pdf$/i.test(name)) name += '.pdf';
+  const a = document.createElement('a');
+  a.href = href; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  if (revoke) setTimeout(() => URL.revokeObjectURL(href), 3000);
+}
 
 // ユーザーアイコン：タップでログアウトを出す小さなポップオーバー。外側タップで閉じる。
 const userAvatar = document.getElementById('userAvatar');

@@ -147,6 +147,7 @@ export async function loadRequestForCheck(reqUuid){
     const blob = await pres.blob();
     const title = (data.title && data.title.trim()) ? data.title : 'document.pdf';
     loadPdfFile(new File([blob], title.endsWith('.pdf') ? title : title + '.pdf', { type: 'application/pdf' }));
+    appState.pdfUrl = data.pdf || null;   // ダウンロード用
 
     // 被依頼者だけがチェック(録音保存)可。それ以外の研究室メンバーは閲覧のみ。
     if (data.canCheck){

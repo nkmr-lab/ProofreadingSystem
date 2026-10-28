@@ -34,6 +34,7 @@ export async function loadDataFromServer(_uuid){
       appState.recipients = Array.isArray(data.recipients) ? data.recipients : [];
       appState.restricted = (data.restricted !== undefined) ? !!data.restricted : (appState.recipients.length > 0);
 
+      appState.pdfUrl = data.pdf || null;   // ダウンロード用（ビューアはFileを持たない）
       loadPDF(data.pdf);
       await setAudioSourceOrFallback(data.audio);
 

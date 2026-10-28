@@ -16,6 +16,7 @@ export function updateButtons() {
         setHidden('audioPlayer', false);
         setHidden('skipSilence', false);   // 無音スキップは閲覧時のみ
         setHidden('shareReview', false);   // 共有ボタンは閲覧時のみ
+        setHidden('downloadPdf', false);   // PDFダウンロードは閲覧時に出す
         setHidden('prev-page', true);
         setHidden('next-page', true);
         setHidden('drawing-mode', true);
@@ -56,6 +57,7 @@ export function updateButtons() {
                 setDisabled('next-page', appState.currentPageNum >= pdfDoc.numPages);
                 setHidden('homeButton', false);
                 setHidden('userMenu', false);
+                setHidden('downloadPdf', false);   // 閲覧のみでもPDFは落とせる
                 const rec0 = document.getElementById('recordServer');
                 if (rec0) rec0.classList.remove('blink');
                 return;
@@ -111,6 +113,7 @@ export function updateButtons() {
             // 録音終了ボタンも録音中はふわふわ（開始ボタンと同じく「押せる」合図）
             const stopB = document.getElementById('recordStop');
             if (stopB) stopB.classList.toggle('blink', appState.isRecording);
+            setHidden('downloadPdf', appState.isRecording);   // 録音中以外はPDFダウンロードを出す
         } else {
             document.body.style.overflow = "auto";
             setHidden('description', false);
@@ -123,6 +126,7 @@ export function updateButtons() {
             setHidden('recordStop', true);
             setHidden('recordPause', true);
             setHidden('loginServerBtn', appState.loggedIn);   // 未ログインならホームでもログイン入口を出す
+            setHidden('downloadPdf', true);   // ホーム（PDF未読込）では出さない
             setHidden('prev-page', true);
             setHidden('next-page', true);
             setHidden('drawing-mode', true);

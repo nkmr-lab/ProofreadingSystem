@@ -30,6 +30,7 @@ $logoutUrl = nkmrauth_logout_url();
 <input type="button" id='homeButton' class="btn btn--icon" onclick="location.href='/'" value="🏚️">
 <button id="shareReview" class="btn btn--primary" style="display:none;">🔗 共有</button>
 <button id="deleteReview" class="btn btn--danger" style="display:none;">🗑️削除</button>
+<button id="downloadPdf" class="btn btn--neutral" style="display:none;" title="表示中のPDFをダウンロード">⬇️ PDF</button>
 <div id="speedButtons" class="speedButtons">
     再生速度：
     <button type="button" class="btn speedBtn" data-rate="1.0">×1.0</button>
