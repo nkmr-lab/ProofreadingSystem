@@ -174,6 +174,41 @@ function respond_from_hybrid($raw, $gptText, $me) {
     exit;
 }
 
+// gpt-4o-transcribe の単発呼び出し（本文を返す。失敗時は''）。
+function tr_gpt_one($path, $key, $prompt){
+    $ch = curl_init('https://api.openai.com/v1/audio/transcriptions');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $key],
+        CURLOPT_POSTFIELDS => ['file'=>new CURLFile($path,'audio/mp4',basename($path)),'model'=>'gpt-4o-transcribe','response_format'=>'json','language'=>'ja','prompt'=>$prompt],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 300,
+    ]);
+    $r = curl_exec($ch); $c = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    if ($c >= 200 && $c < 300){ $d = json_decode((string)$r, true); if (is_array($d)) return trim((string)($d['text'] ?? '')); }
+    return '';
+}
+// gpt-4o-transcribe で本文を得る。★生音声を使う（speechnorm正規化は静かな音声でgptを劣化させるため）。
+// ★gpt-4o系は約25分(1500秒)が上限なので、超える音声はチャンク分割して結合する。
+function tr_gpt_text($audio, $key, $prompt){
+    $dur = 0.0;
+    $o = @shell_exec('/usr/bin/ffprobe -v error -show_entries format=duration -of csv=p=0 ' . escapeshellarg($audio) . ' 2>/dev/null');
+    $dur = (float)trim((string)$o);
+    $CHUNK = 1400;
+    if ($dur <= 0 || $dur <= $CHUNK) return tr_gpt_one($audio, $key, $prompt);
+    $n = (int)ceil($dur / $CHUNK);
+    $parts = [];
+    for ($i = 0; $i < $n; $i++){
+        $ss = $i * $CHUNK;
+        $tmp = sys_get_temp_dir() . '/gptc_' . getmypid() . '_' . $i . '.m4a';
+        $cmd = '/usr/bin/ffmpeg -y -ss ' . $ss . ' -t ' . $CHUNK . ' -i ' . escapeshellarg($audio)
+             . ' -ac 1 -ar 16000 -c:a aac -b:a 64k ' . escapeshellarg($tmp) . ' 2>/dev/null';
+        @exec($cmd, $oo, $rc);
+        if ($rc === 0 && is_file($tmp)){ $t = tr_gpt_one($tmp, $key, $prompt); if ($t !== '') $parts[] = $t; @unlink($tmp); }
+    }
+    return implode("\n", $parts);
+}
+
 $filesDir = __DIR__ . '/files/';
 $metaDir  = __DIR__ . '/meta/';
 if (!is_dir($metaDir)) {
@@ -274,24 +309,8 @@ if ($method === 'POST') {
     $cerr = curl_error($ch);
     curl_close($ch);
 
-    // gpt-4o-transcribe（高精度本文）。whisperと同じ前処理音声を使う。失敗してもwhisperで続行。
-    $gch = curl_init('https://api.openai.com/v1/audio/transcriptions');
-    curl_setopt_array($gch, [
-        CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $OPENAI_KEY],
-        CURLOPT_POSTFIELDS => [
-            'file'            => new CURLFile($sendPath, 'audio/mp4', $uuid . '.m4a'),
-            'model'           => 'gpt-4o-transcribe',
-            'response_format' => 'json',
-            'language'        => 'ja',
-            'prompt'          => $WHISPER_PROMPT,
-        ],
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 300,
-    ]);
-    $gresp = curl_exec($gch);
-    $gcode = curl_getinfo($gch, CURLINFO_HTTP_CODE);
-    curl_close($gch);
+    // gpt-4o-transcribe（高精度本文）。★生音声から（speechnorm劣化回避）＋25分超はチャンク分割。失敗してもwhisperで続行。
+    $gptText = tr_gpt_text($audio, $OPENAI_KEY, $WHISPER_PROMPT);
 
     if ($tmpNorm && is_file($tmpNorm)) @unlink($tmpNorm);   // 正規化一時ファイルを掃除
 
@@ -307,12 +326,7 @@ if ($method === 'POST') {
         if (!@rename($tmp, $rawFile)) @unlink($tmp);
     }
 
-    // gpt 本文を取り出してキャッシュ（成功時）。幻聴に強い高精度本文。
-    $gptText = '';
-    if ($gcode >= 200 && $gcode < 300) {
-        $gd = json_decode((string)$gresp, true);
-        if (is_array($gd)) $gptText = trim((string)($gd['text'] ?? ''));
-    }
+    // gpt 本文をキャッシュ（取れた時のみ）。幻聴に強い高精度本文。
     if ($gptText !== '') {
         $gtmp = $gptFile . '.tmp' . getmypid();
         $gpayload = json_encode(['text' => $gptText, 'model' => 'gpt-4o-transcribe', 'generated' => gmdate('c')], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
