@@ -63,9 +63,9 @@ $logoutUrl = nkmrauth_logout_url();
 <?php endif; ?>
 
 <div id="inputModeBox">
-<button class="input-toggle active" id="allowPen" data-mode="pen">Pen</button>
-<button class="input-toggle active" id="allowTouch" data-mode="touch">Touch</button>
-<button class="input-toggle active" id="allowMouse" data-mode="mouse">Mouse</button>
+<button class="input-toggle active" id="allowPen" data-mode="pen" title="ペン" aria-label="ペン">✏️</button>
+<button class="input-toggle active" id="allowTouch" data-mode="touch" title="指（タッチ）" aria-label="指（タッチ）">👆</button>
+<button class="input-toggle active" id="allowMouse" data-mode="mouse" title="マウス" aria-label="マウス">🖱️</button>
 </div>
 
 <!-- スマホ限定：1本指の用途を切替（PC/iPadでは非表示） -->

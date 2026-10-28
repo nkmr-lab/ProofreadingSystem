@@ -130,10 +130,11 @@ button:focus-visible, .btn:focus-visible{ outline:2px solid var(--accent); outli
 #inputModeBox{ display:inline-flex; align-items:center; gap:4px; }
 .input-toggle{
   color:var(--muted);
-  padding:0 9px;
-  font-size:12px;
+  padding:0 8px;
+  font-size:15px;          /* 絵文字(✏️👆🖱️)を見やすく */
 }
-.input-toggle.active{ background:var(--accent); color:#fff; border-color:var(--accent); }
+.input-toggle:not(.active){ opacity:.4; filter:grayscale(.5); }   /* OFF＝淡色 */
+.input-toggle.active{ background:var(--accent); color:#fff; border-color:var(--accent); opacity:1; filter:none; }
 
 /* ===== スマホ用「移動/手書き」切替（セグメント） ===== */
 #touchModeBox{ display:inline-flex; align-items:center; gap:0; }
