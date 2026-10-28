@@ -125,9 +125,14 @@ if ($method === 'POST') {
     }
 
     $OPENAI_KEY = '';
+    $WHISPER_PROMPT = '';
     $cfg = __DIR__ . '/config.local.php';
-    if (is_file($cfg)) { $c = require $cfg; if (is_array($c)) $OPENAI_KEY = $c['openai_key'] ?? ''; }
+    if (is_file($cfg)) { $c = require $cfg; if (is_array($c)) { $OPENAI_KEY = $c['openai_key'] ?? ''; $WHISPER_PROMPT = (string)($c['whisper_prompt'] ?? ''); } }
     if ($OPENAI_KEY === '') j_err('OpenAI APIキーが未設定です（サーバ管理者に config.local.php の設定を依頼してください）', 500);
+    // 語彙・句読点をバイアスして精度を上げるプロンプト（config.local.php の whisper_prompt で上書き可）。
+    if ($WHISPER_PROMPT === '') {
+        $WHISPER_PROMPT = '日本語の研究論文に対する校閲コメントの音声です。ヒューマンコンピュータインタラクション、ユーザインタフェース、ユーザビリティ、被験者、実験、評価、提案手法、関連研究などの専門用語や、カタカナ語・英単語・人名が含まれます。句読点を適切に付けてください。';
+    }
 
     $audio = $filesDir . $uuid . '.m4a';
     if (!is_file($audio)) j_err('音声が見つかりません', 404);
@@ -162,6 +167,7 @@ if ($method === 'POST') {
             'model'           => 'whisper-1',
             'response_format' => 'verbose_json',
             'language'        => 'ja',
+            'prompt'          => $WHISPER_PROMPT,   // 語彙・句読点バイアスで精度向上
             // temperature は送らない＝APIの temperature フォールバック（反復検出時に再デコード）に任せる
         ],
         CURLOPT_RETURNTRANSFER => true,
