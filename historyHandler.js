@@ -247,6 +247,9 @@ export async function loadMyHistory(){
     renderRequestsOut(data.requests_out || []);               // 自分が出した依頼
     fillList('sharedList', 'sharedBox', data.shared || []);       // 自分に共有された(既定2件)
     fillList('historyList', 'historyBox', data.items || [], 5, true);   // 自分のチェック履歴は直近5件＋もっと見る（🗑で削除可）
+    // チェック履歴がある人には「システムの使い方」は不要なので隠す（初めての人にだけ出す）
+    const desc = document.getElementById('description');
+    if (desc && (data.items || []).length > 0) desc.style.display = 'none';
   } catch (e) {
     console.warn('履歴の取得に失敗:', e);
   }
