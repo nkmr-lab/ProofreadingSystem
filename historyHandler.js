@@ -45,31 +45,44 @@ function makeRow(it, deletable = false){
     `<span class="hist-meta">${it.hasAudio ? '🎙️ ' : ''}${who}${escapeHtml(fmtDate(it.created))}</span>`;
   row.appendChild(a);
   if (deletable){
-    // 🔁 やり直す：同じ原稿をもう一度チェック（新規録音）。元の履歴は残る。
-    const redo = document.createElement('button');
-    redo.type = 'button';
-    redo.className = 'hist-redo';
-    redo.title = 'やり直す（もう一度チェック）';
-    redo.setAttribute('aria-label', 'やり直す');
-    redo.textContent = '🔁';
-    redo.addEventListener('click', (e) => {
+    // ⋯メニュー（クリックで「録音し直す／削除」を表示）。誤タップで即発火しないようにする。
+    bindHistMenuGlobalClose();
+    const menu = document.createElement('div');
+    menu.className = 'hist-menu';
+
+    const mbtn = document.createElement('button');
+    mbtn.type = 'button';
+    mbtn.className = 'hist-menu-btn';
+    mbtn.title = 'メニュー';
+    mbtn.setAttribute('aria-label', 'メニュー');
+    mbtn.setAttribute('aria-expanded', 'false');
+    mbtn.textContent = '⋯';
+
+    const pop = document.createElement('div');
+    pop.className = 'hist-menu-pop';
+    pop.hidden = true;
+
+    const redoItem = document.createElement('button');
+    redoItem.type = 'button';
+    redoItem.className = 'hist-menu-item';
+    redoItem.textContent = '🔁 録音し直す';
+    redoItem.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
       location.assign('/?recheck=' + encodeURIComponent(it.uuid));
     });
-    row.appendChild(redo);
 
-    const del = document.createElement('button');
-    del.type = 'button';
-    del.className = 'hist-del';
-    del.title = '削除';
-    del.setAttribute('aria-label', '削除');
-    del.textContent = '🗑';
-    del.addEventListener('click', async (e) => {
+    const delItem = document.createElement('button');
+    delItem.type = 'button';
+    delItem.className = 'hist-menu-item hist-menu-item--danger';
+    delItem.textContent = '🗑 削除';
+    delItem.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
+      pop.hidden = true;
+      mbtn.setAttribute('aria-expanded', 'false');
       if (!confirm(`「${title}」を削除します。元に戻せません。よろしいですか？`)) return;
-      del.disabled = true;
+      delItem.disabled = true;
       try {
         const r = await fetch('api.php', {
           method: 'POST',
@@ -80,13 +93,44 @@ function makeRow(it, deletable = false){
         if (!r.ok || d.status !== 'success') throw new Error(d.message || `削除に失敗しました (${r.status})`);
         row.remove();
       } catch (err) {
-        del.disabled = false;
+        delItem.disabled = false;
         alert(err.message || '削除に失敗しました');
       }
     });
-    row.appendChild(del);
+
+    pop.appendChild(redoItem);
+    pop.appendChild(delItem);
+
+    mbtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const willOpen = pop.hidden;
+      closeAllHistMenus();
+      pop.hidden = !willOpen;
+      mbtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    });
+
+    menu.appendChild(mbtn);
+    menu.appendChild(pop);
+    row.appendChild(menu);
   }
   return row;
+}
+
+// 開いている履歴メニューを全部閉じる
+function closeAllHistMenus(){
+  document.querySelectorAll('.hist-menu-pop:not([hidden])').forEach(p => {
+    p.hidden = true;
+    const b = p.parentElement && p.parentElement.querySelector('.hist-menu-btn');
+    if (b) b.setAttribute('aria-expanded', 'false');
+  });
+}
+// 画面のどこかをクリックしたらメニューを閉じる（一度だけ登録）
+let histMenuBound = false;
+function bindHistMenuGlobalClose(){
+  if (histMenuBound) return;
+  histMenuBound = true;
+  document.addEventListener('click', () => closeAllHistMenus());
 }
 
 // api.php への JSON POST（成功以外は例外）

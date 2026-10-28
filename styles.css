@@ -442,6 +442,16 @@ body.is-phone #inputModeBox{ display:none !important; }
 .hist-del:hover:not(:disabled){ background:#fde8e8; color:#c0392b; }
 .hist-redo:hover:not(:disabled){ background:#e8eefd; }
 .hist-del:disabled, .hist-redo:disabled{ opacity:.5; cursor:default; }
+/* 履歴行の⋯メニュー（録音し直す／削除） */
+.hist-menu{ position:relative; flex:0 0 auto; }
+.hist-menu-btn{ background:none; border:none; cursor:pointer; font-size:20px; line-height:1; padding:4px 10px; border-radius:8px; color:var(--muted); }
+.hist-menu-btn:hover{ background:#eef0f3; }
+.hist-menu-pop{ position:absolute; right:0; top:34px; z-index:50; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:var(--shadow-md); padding:6px; min-width:160px; display:flex; flex-direction:column; gap:2px; }
+.hist-menu-pop[hidden]{ display:none; }
+.hist-menu-item{ display:block; width:100%; text-align:left; background:none; border:none; cursor:pointer; padding:9px 10px; border-radius:7px; font-size:14px; color:var(--ink); white-space:nowrap; }
+.hist-menu-item:hover{ background:#eef2ff; }
+.hist-menu-item--danger{ color:#c0392b; }
+.hist-menu-item--danger:hover{ background:#fde8e8; }
 .hist-title{ font-weight:600; font-size:15px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .hist-meta{ flex:0 0 auto; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
 .hist-more{
