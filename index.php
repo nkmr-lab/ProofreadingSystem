@@ -49,7 +49,7 @@ $logoutUrl = nkmrauth_logout_url();
 <button id="next-page" class="btn btn--neutral" disabled>次＞</button>
 
 <button id="drawing-mode" class="btn btn--neutral" disabled>[描く] 消す</button>
-<button id="undo" class="btn btn--neutral" disabled>戻す</button>
+<button id="undo" class="btn btn--neutral" title="戻す（元に戻す）" aria-label="戻す" disabled>↩️</button>
 
 <div id="pdfControls">
 <button id="file-select-button" class="btn btn--primary">PDF読込</button>

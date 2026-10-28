@@ -133,6 +133,7 @@ button:focus-visible, .btn:focus-visible{ outline:2px solid var(--accent); outli
   padding:0 8px;
   font-size:15px;          /* 絵文字(✏️👆🖱️)を見やすく */
 }
+#undo{ font-size:15px; }   /* ↩️ 絵文字を見やすく */
 .input-toggle:not(.active){ opacity:.4; filter:grayscale(.5); }   /* OFF＝淡色 */
 .input-toggle.active{ background:var(--accent); color:#fff; border-color:var(--accent); opacity:1; filter:none; }
 
