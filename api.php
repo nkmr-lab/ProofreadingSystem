@@ -100,86 +100,10 @@ function delete_uuid_files($dir, $uuid) {
     if (is_file($wf)) @unlink($wf);
 }
 
-// ===== LabPay 連携（作業中一覧 / 受諾通知）=====
-// 作業中タスクは Web 非公開の meta/inreview/{review_id}_{reviewer_row_id}.json に保存。
-function inreview_dir() {
-    $d = meta_dir() . 'inreview/';
-    if (!is_dir($d)) { @mkdir($d, 0777, true); @file_put_contents($d . '.htaccess', "Require all denied\n"); }
-    return $d;
-}
-// config.local.php の読み込み（local_config）は config_util.php に集約（transcribe.php と共用）
-require_once __DIR__ . '/config_util.php';
-
-// 原稿/校正の作成者本人か（owner meta の email とログイン email が一致）
-function is_owner($owner, $me) {
-    if (!is_array($owner) || !$me) return false;
-    $oe = strtolower(trim($owner['email'] ?? ''));
-    return $oe !== '' && $oe === strtolower(trim($me['email'] ?? ''));
-}
-
-// pr↔LabPay サーバ間共通シークレット（config.local.php の pr_integration.shared_secret）
-function read_pr_secret() {
-    return (string)(local_config()['pr_integration']['shared_secret'] ?? '');
-}
-function verify_pr_secret() {
-    $secret = read_pr_secret();
-    if ($secret === '') json_error('連携シークレットが未設定です（サーバ管理者へ）', 503);
-    if (!hash_equals($secret, (string)($_SERVER['HTTP_X_PR_SECRET'] ?? ''))) json_error('invalid secret', 401);
-}
-// Phase1: LabPay が reviewer の「受ける」で呼ぶ。作業中として登録（冪等）。
-function handle_mark_in_review($input) {
-    verify_pr_secret();
-    $reviewId = (int)($input['review_id'] ?? 0);
-    $rrId     = (int)($input['reviewer_row_id'] ?? 0);
-    $email    = trim((string)($input['reviewer_email'] ?? ''));
-    if ($reviewId <= 0 || $rrId <= 0 || $email === '') json_error('missing fields', 400);
-    // pull_url / result_callback は pay.nkmr.io 限定
-    foreach (['pull_url', 'result_callback'] as $k) {
-        $h = strtolower((string)parse_url((string)($input[$k] ?? ''), PHP_URL_HOST));
-        if ($h !== 'pay.nkmr.io') json_error("invalid $k host", 400);
-    }
-    $key = $reviewId . '_' . $rrId;
-    $task = [
-        'review_id' => $reviewId, 'reviewer_row_id' => $rrId,
-        'reviewer_email' => $email, 'reviewer_name' => (string)($input['reviewer_name'] ?? ''),
-        'requester_name' => (string)($input['requester_name'] ?? ''), 'title' => (string)($input['title'] ?? ''),
-        'pull_url' => (string)($input['pull_url'] ?? ''), 'result_callback' => (string)($input['result_callback'] ?? ''),
-        'cbt' => (string)($input['cbt'] ?? ''),   // ※§4.1に無いが、来れば結果返却に使う
-        'accepted_at' => (string)($input['accepted_at'] ?? ''), 'created' => gmdate('c'), 'done' => false,
-    ];
-    meta_put(inreview_dir() . $key . '.json', json_encode($task, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-    echo json_encode(['ok' => true, 'pr_task_id' => $key], JSON_UNESCAPED_SLASHES);
-}
-// Phase2: 自分の作業中タスク一覧
-function list_inreview($me, $filesDir = null) {
-    $meEmail = strtolower(trim($me['email'] ?? ''));
-    if ($meEmail === '') return [];
-    $items = [];
-    $dir = inreview_dir();
-    foreach (@scandir($dir) ?: [] as $fn) {
-        if (!preg_match('/^([A-Za-z0-9_]+)\.json$/', $fn, $m)) continue;
-        $t = json_decode(@file_get_contents($dir . $fn), true);
-        if (!is_array($t) || !empty($t['done'])) continue;
-        if (strtolower(trim($t['reviewer_email'] ?? '')) !== $meEmail) continue;
-        // 受領したPDFコピーがあればそのサイズ（同一原稿の判別用）。無ければ null。
-        $size = null;
-        $src = (string)($t['source_pdf_uuid'] ?? '');
-        if ($filesDir && $src !== '' && is_file($filesDir . $src . '.pdf')) $size = @filesize($filesDir . $src . '.pdf') ?: null;
-        $items[] = ['key' => $m[1], 'title' => $t['title'] ?? '', 'requester' => $t['requester_name'] ?? '', 'accepted_at' => $t['accepted_at'] ?? ($t['created'] ?? ''), 'size' => $size];
-    }
-    usort($items, fn($a, $b) => strcmp($b['accepted_at'], $a['accepted_at']));
-    return $items;
-}
-// 作業中タスク1件（本人のみ）。無ければ null。
-function get_inreview($key, $me) {
-    if (!preg_match('/^[A-Za-z0-9_]+$/', (string)$key)) return null;
-    $p = inreview_dir() . $key . '.json';
-    if (!is_file($p)) return null;
-    $t = json_decode(@file_get_contents($p), true);
-    if (!is_array($t)) return null;
-    if (strtolower(trim($t['reviewer_email'] ?? '')) !== strtolower(trim($me['email'] ?? ''))) return null;
-    return $t;
-}
+// 共通ヘルパーは別ファイルへ集約（見通しと再利用のため）
+require_once __DIR__ . '/config_util.php';   // local_config()
+require_once __DIR__ . '/pr_access.php';      // is_owner / review_share_settings / can_view_review / is_requested_reviewer
+require_once __DIR__ . '/labpay.php';         // inreview_* / handle_mark_in_review / notify_labpay / read_pr_secret / verify_pr_secret
 
 // 現在のユーザーが所有する校正の一覧（新しい順）。meta/{uuid}.json を走査。
 function list_my_reviews($filesDir, $me) {
@@ -316,26 +240,7 @@ function openai_chat($payload, $timeout = 60) {
 // LabPay側で in-app通知／本人Slack DM／#labpay ブロードキャストを行う。
 // 送信先URLと Bearer シークレットは config.local.php の labpay_event_url / labpay_event_secret。
 // 未設定なら何もしない。サーバ間POSTでCORS無関係・best-effort（失敗しても本処理は止めない）。
-function notify_labpay($payload) {
-    $c = local_config();
-    $url = (string)($c['labpay_event_url'] ?? '');
-    $secret = (string)($c['labpay_event_secret'] ?? '');
-    if ($url === '' || $secret === '' || strtolower((string)parse_url($url, PHP_URL_HOST)) !== 'pay.nkmr.io') return;
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => [
-            'Content-Type: application/json; charset=utf-8',
-            'Authorization: Bearer ' . $secret,
-        ],
-        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 5,
-        CURLOPT_CONNECTTIMEOUT => 4,
-    ]);
-    @curl_exec($ch);
-    curl_close($ch);
-}
+// notify_labpay() は labpay.php に移動
 
 // ===== AI査読（LabPay由来のプロンプト）: 原稿PDFを読んで構造化レビューをJSONで返す =====
 function review_system_prompt() {
@@ -828,10 +733,9 @@ if ($method === 'GET' && ($_GET['action'] ?? '') === 'request_get') {
     if (!is_valid_uuid($uuid)) json_error('Invalid uuid', 400);
     $o = read_owner($uuid);
     if (!is_array($o) || !isset($o['review_request'])) json_error('依頼が見つかりません', 404);
-    $meEmail = strtolower(trim($me['email'] ?? ''));
-    $amRequester = ($meEmail !== '' && strtolower(trim($o['email'] ?? '')) === $meEmail);
+    $amRequester = is_owner($o, $me);
     $rv = $o['review_request']['reviewers'][$me['user'] ?? ''] ?? null;
-    $amReviewer = is_array($rv);
+    $amReviewer = is_requested_reviewer($o, $me);
     // 研究室ログイン済みなら誰でも原稿を閲覧できる（require_loginは通過済み）。
     // チェック(録音して保存)できるのは被依頼者のみ＝canCheck。
     if (!is_file($targetDir . $uuid . '.pdf')) json_error('原稿が見つかりません', 404);
@@ -911,21 +815,15 @@ if ($method === 'GET' && isset($_GET['uuid'])) {
     $audioFile = safe_path($targetDir, $uuid, 'm4a');
 
     if (file_exists($pdfFile) && file_exists($jsonFile)) {
-        // ---- アクセス制御 ----
-        // recipients = 共有相手(ホーム「共有された」に出る)。restricted=true のときだけ閲覧を本人＋相手に限定。
-        // restricted=false なら「相手に届けるが、リンクを知っていれば誰でも閲覧可(公開)」。
-        // 旧データ(restrictedキー無し)は従来どおり recipients があれば限定扱い。
+        // ---- アクセス制御（pr_access.php に集約）----
+        // 限定公開(restricted かつ recipients あり)なら作成者＋指定相手のみ。それ以外は公開。
         $me = nkmrauth_identity();
         $owner = read_owner($uuid);
-        $recipients = (is_array($owner) && is_array($owner['recipients'] ?? null)) ? $owner['recipients'] : [];
-        $restricted = (is_array($owner) && array_key_exists('restricted', $owner)) ? (bool)$owner['restricted'] : !empty($recipients);
         $isOwner = is_owner($owner, $me);
-        if (!empty($recipients) && $restricted) {
-            $allowed = $isOwner || ($me && in_array($me['user'] ?? '', $recipients, true));
-            if (!$allowed) {
-                json_error($me ? 'この校正の閲覧権限がありません（作成者が指定した人のみ閲覧できます）' : 'この校正は限定公開です。中村研アカウントでログインしてください。', 403);
-            }
+        if (!can_view_review($owner, $me)) {
+            json_error($me ? 'この校正の閲覧権限がありません（作成者が指定した人のみ閲覧できます）' : 'この校正は限定公開です。中村研アカウントでログインしてください。', 403);
         }
+        list($recipients, $restricted) = review_share_settings($owner);
 
         $jsonData = file_get_contents($jsonFile);
         if ($jsonData === false) json_error('Failed to read session', 500);

@@ -65,7 +65,9 @@ pr.nkmr.io — PDF原稿を「音声＋手書き」で校正して返すツー�
   - GETアクション: `mine`(ホーム一覧), `request_get`, `inreview_get`, `ai_review`, `roster`(auth中継), `?uuid=`(閲覧データ or manuscript)。
 - **transcribe.php** … ハイブリッド文字起こし（§7）。
 - **nkmrauth.php** … SSO（Ed25519 cookie 検証）。公開鍵のみでpublicリポOK。
-- **config_util.php** … `local_config()`。
+- **config_util.php** … `local_config()`（api.php / transcribe.php 共用）。
+- **pr_access.php** … 認可の集約: `is_owner / review_share_settings / can_view_review / is_requested_reviewer`（api.php / transcribe.php 共用）。
+- **labpay.php** … LabPay連携の集約: `inreview_dir / read_pr_secret / verify_pr_secret / handle_mark_in_review / list_inreview / get_inreview / notify_labpay`（api.php が require）。
 
 ## 6. クライアント（Vanilla JS ESM）
 

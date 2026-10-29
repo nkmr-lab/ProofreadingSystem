@@ -13,6 +13,7 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/nkmrauth.php';
 require_once __DIR__ . '/config_util.php';   // local_config()（api.phpと共用）
+require_once __DIR__ . '/pr_access.php';      // can_view_review()（api.phpと共用）
 
 // 研究室ログイン限定
 $me = nkmrauth_identity();
@@ -221,15 +222,9 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $uuid = $_GET['uuid'] ?? ($_POST['uuid'] ?? '');
 if (!is_valid_uuid($uuid)) j_err('Invalid uuid');
 
-// recipients 制限を尊重（限定公開なら本人＋指定相手のみ文字起こし可）
-$ownerFile = $metaDir . $uuid . '.json';
-$owner = is_file($ownerFile) ? json_decode(@file_get_contents($ownerFile), true) : null;
-$recips = (is_array($owner) && is_array($owner['recipients'] ?? null)) ? $owner['recipients'] : [];
-$restricted = (is_array($owner) && array_key_exists('restricted', $owner)) ? (bool)$owner['restricted'] : !empty($recips);
-if (!empty($recips) && $restricted) {
-    $isOwner = strtolower(trim($me['email'] ?? '')) === strtolower(trim($owner['email'] ?? '')) && ($owner['email'] ?? '') !== '';
-    if (!$isOwner && !in_array($me['user'] ?? '', $recips, true)) j_err('閲覧権限がありません', 403);
-}
+// recipients 制限を尊重（限定公開なら本人＋指定相手のみ文字起こし可）。判定は pr_access.php に集約。
+$owner = is_file($metaDir . $uuid . '.json') ? json_decode(@file_get_contents($metaDir . $uuid . '.json'), true) : null;
+if (!can_view_review($owner, $me)) j_err('閲覧権限がありません', 403);
 
 $rawFile = $metaDir . $uuid . '.whisper.json';   // whisper 生応答のキャッシュ（時刻用）
 $gptFile = $metaDir . $uuid . '.gpt.json';       // gpt-4o-transcribe 本文のキャッシュ（本文用）
