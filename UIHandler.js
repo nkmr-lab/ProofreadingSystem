@@ -33,11 +33,13 @@ export function updateButtons() {
         setDisabled('undo', true);
 
         if (appState.staticMode){
-            // 静的モード：全書き込み表示＋ページ移動＋サムネ一覧。再生系は隠す。
+            // 静的モード：全書き込み表示＋ページ移動＋サムネ一覧。再生系・文字起こし・査読は隠す。
             setHidden('audioPlayer', true);
             setHidden('speedButtons', true);
             setHidden('skipSilence', true);
             setHidden('shareReview', true);
+            setHidden('genTranscript', true);   // 文字起こしは静的モード中は出さない
+            setHidden('genReview', true);        // AI査読も静的モード中は出さない
             setHidden('prev-page', false);
             setHidden('next-page', false);
             setDisabled('prev-page', appState.currentPageNum <= 1);

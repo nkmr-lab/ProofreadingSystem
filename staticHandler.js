@@ -9,6 +9,34 @@ import { updateButtons } from './UIHandler.js';
 import { resetView } from './viewportHandler.js';
 
 let panelEl = null, thumbsEl = null;
+const savedDisp = {};   // 静的モード突入前の文字起こし/査読ボタンの表示状態を覚える
+
+// 静的モードボタンのラベルを切り替える（ONのときは「音声再生モードに戻す」）。
+function setStaticBtnLabel(on){
+  const b = document.getElementById('staticMode');
+  if (!b) return;
+  b.textContent = on ? '🔊 音声再生モード' : '📄 静的モード';
+  b.title = on ? '音声に同期した再生表示に戻す' : '静的モード（全ページの書き込みを一覧）';
+}
+
+// 静的モード中は文字起こし・AI査読（ボタンとパネル）を隠す。突入前の状態は savedDisp に退避。
+function hidePanelsForStatic(){
+  ['genTranscript', 'genReview'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) { savedDisp[id] = b.style.display; b.style.display = 'none'; }
+  });
+  ['transcriptPanel', 'reviewPanel'].forEach(id => {
+    const p = document.getElementById(id);
+    if (p) p.style.display = 'none';
+  });
+  document.body.classList.remove('t-open', 'r-open');   // 左右分割レイアウトも解除
+}
+function restorePanelsAfterStatic(){
+  ['genTranscript', 'genReview'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) b.style.display = (savedDisp[id] ?? '');   // 突入前の状態へ（未ログインは none のまま）
+  });
+}
 
 export function initStaticUI(){
   panelEl  = document.getElementById('staticPanel');
@@ -27,6 +55,8 @@ function enterStatic(){
   if (!pdfDoc) return;
   appState.staticMode = true;
   try { document.getElementById('audioPlayer')?.pause?.(); } catch {}   // 再生と競合させない
+  hidePanelsForStatic();    // 文字起こし・AI査読は静的モード中は消す
+  setStaticBtnLabel(true);  // ボタンを「音声再生モードに戻す」に
   if (panelEl) panelEl.style.display = '';
   document.body.classList.add('static-open');
   renderStaticPage(appState.currentPageNum || 1);
@@ -38,6 +68,8 @@ function exitStatic(){
   appState.staticMode = false;
   if (panelEl) panelEl.style.display = 'none';
   document.body.classList.remove('static-open');
+  restorePanelsAfterStatic();   // 文字起こし・AI査読ボタンを元に戻す
+  setStaticBtnLabel(false);     // ボタンを「静的モード」に戻す
   // 書き込みを消して現在ページだけに戻す（再生に戻ったら timeline が改めて描く）
   renderPage(appState.currentPageNum || 1);
   try { redrawFromStrokes([], pdfScale); } catch {}

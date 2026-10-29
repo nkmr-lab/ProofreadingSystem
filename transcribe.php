@@ -144,23 +144,35 @@ function build_hybrid($raw, $gptText) {
     $mx = 0.0;
     for ($k = 0; $k < $G; $k++) { if ($charTime[$k] < $mx) $charTime[$k] = $mx; else $mx = $charTime[$k]; }
 
-    // (2) gpt 本文を文単位で区切る（単語途中で切らない）。長すぎる文は読点でも分ける。
+    // (2) gpt 本文を区切る。句読点だけに頼らず「間(時刻の飛び＝whisperセグメント境界)」と
+    //     「文字数上限」でも分ける。gpt-4o-transcribe が句読点を返さないことがあり、その場合
+    //     句読点依存だと全文が1塊＝全部 start 0:00 になって使えなくなるため。
+    $PAUSE = 1.0;   // この秒数以上の間があれば文の切れ目とみなす
+    $HARD  = 100;   // 句読点も間も無いときの強制分割(文字)
+    $SOFT  = 40;    // この長さ以上で読点が来たら分ける
     $out = [];
-    $buf = ''; $bufStart = null; $bufEnd = 0.0;
+    $buf = ''; $bufStart = null; $prevT = null;
     for ($k = 0; $k < $G; $k++) {
         $ch = $Gall[$k];
-        if ($bufStart === null) $bufStart = $charTime[$k];
+        $t  = $charTime[$k];
+        // 直前の文字から時刻が飛んだ＝間が空いた→ここまでを確定し、この文字から新しい断片。
+        if ($buf !== '' && $prevT !== null && ($t - $prevT) >= $PAUSE) {
+            $out[] = ['start' => $bufStart, 'end' => $prevT, 'text' => trim($buf)];
+            $buf = ''; $bufStart = null;
+        }
+        if ($bufStart === null) $bufStart = $t;
         $buf .= $ch;
-        $bufEnd = $charTime[$k];
-        $isEnd  = preg_match('/[。！？!?\n]/u', $ch);
-        $soft   = (mb_strlen($buf) >= 60 && preg_match('/[、]/u', $ch));
-        if ($isEnd || $soft) {
-            $t = trim($buf);
-            if ($t !== '') $out[] = ['start' => $bufStart, 'end' => $bufEnd, 'text' => $t];
+        $prevT = $t;
+        $isEnd = preg_match('/[。！？!?\n]/u', $ch);
+        $soft  = (mb_strlen($buf) >= $SOFT && preg_match('/[、]/u', $ch));
+        $hard  = (mb_strlen($buf) >= $HARD);
+        if ($isEnd || $soft || $hard) {
+            $tt = trim($buf);
+            if ($tt !== '') $out[] = ['start' => $bufStart, 'end' => $t, 'text' => $tt];
             $buf = ''; $bufStart = null;
         }
     }
-    if (trim($buf) !== '') $out[] = ['start' => $bufStart ?? $lastT, 'end' => $bufEnd, 'text' => trim($buf)];
+    if (trim($buf) !== '') $out[] = ['start' => $bufStart ?? $lastT, 'end' => $prevT ?? $lastT, 'text' => trim($buf)];
     return $out;
 }
 

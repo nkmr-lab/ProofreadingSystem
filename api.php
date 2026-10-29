@@ -427,15 +427,21 @@ if ($method === 'POST') {
                 'created'   => gmdate('c'),
             ];
             meta_put(owner_path($uuid), json_encode($owner, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
-            // 「誰が誰に依頼したか」を LabPay → #labpay へ（pr内依頼のみ）。
-            // レビュアーのメールは pr(SSO名簿) に無いため to_emails は空＝#labpay ブロードキャストのみ。本文にレビュアー名を入れる。
+            // 「誰が誰に依頼したか」を LabPay 経由で通知（pr内依頼のみ）。
+            // LabPay の /api/incoming-notify は to_names（名前）で宛先を解決してくれる
+            // （本人の通知タブに未読バッジ＋Slack DM、さらに #labpay へ1通ブロードキャスト）。
+            // pr は SSO 名簿の「名前」を持つので、メールを知らなくても各レビュアー本人へ届く。
+            // 同姓同名で複数ヒットした相手は誤爆防止で LabPay 側が skipped に積む。
             $reqName = trim((string)($me['name'] ?? $me['user'] ?? '')); if ($reqName === '') $reqName = '依頼者';
-            $revNames = implode('・', array_values(array_map(fn($r) => $r['name'] ?? '', $reviewers)));
+            $revNameList = array_values(array_filter(
+                array_map(fn($r) => trim((string)($r['name'] ?? '')), $reviewers),
+                fn($x) => $x !== ''
+            ));
             $docTitle = trim((string)($owner['title'] ?? '')); if ($docTitle === '') $docTitle = '(無題のPDF)';
             notify_labpay([
                 'source'        => 'pr.nkmr.io',
-                'to_emails'     => [],
-                'body'          => "📝 {$reqName} さんが {$revNames} さんに原稿チェックを依頼: 「{$docTitle}」\n→ https://pr.nkmr.io/{$uuid}",
+                'to_names'      => $revNameList,   // 各レビュアー本人へ（通知タブ＋Slack DM）
+                'body'          => "📝 {$reqName} さんから原稿チェック依頼: 「{$docTitle}」\n→ https://pr.nkmr.io/{$uuid}",
                 'slack_channel' => '#labpay',
             ]);
             echo json_encode(['status' => 'success', 'uuid' => $uuid, 'count' => count($reviewers)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -457,17 +463,19 @@ if ($method === 'POST') {
             $o['review_request']['reviewers'][$meUser]['at'] = gmdate('c');
             meta_put(owner_path($uuid), json_encode($o, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
             // 「誰が誰の原稿を完了したか」を LabPay → 依頼者本人へ(in-app/DM)＋#labpay へ（pr内依頼のみ）。
-            // 依頼者＝原稿所有者のメールは pr が持っているので to_emails に入れられる。
+            // 依頼者＝原稿所有者。メールを持っていれば to_emails で正確に、無ければ to_names（名前）で解決。
             $reqEmail = trim((string)($o['email'] ?? ''));
             $reqName  = trim((string)($o['name'] ?? '')); if ($reqName === '') $reqName = '依頼者';
             $revName  = trim((string)($me['name'] ?? $me['user'] ?? '')); if ($revName === '') $revName = 'レビュアー';
             $docTitle = trim((string)($o['title'] ?? '')); if ($docTitle === '') $docTitle = '(無題のPDF)';
-            notify_labpay([
+            $donePayload = [
                 'source'        => 'pr.nkmr.io',
-                'to_emails'     => ($reqEmail !== '' ? [$reqEmail] : []),
                 'body'          => "✅ {$revName} さんが {$reqName} さんから依頼された原稿『{$docTitle}』をチェックしました\n→ https://pr.nkmr.io/{$result}",
                 'slack_channel' => '#labpay',
-            ]);
+            ];
+            if ($reqEmail !== '') $donePayload['to_emails'] = [$reqEmail];   // メールがあれば正確に本人へ
+            else                  $donePayload['to_names']  = [$reqName];    // 無ければ名前で解決（同姓同名は LabPay が skip）
+            notify_labpay($donePayload);
             echo json_encode(['status' => 'success']);
             exit;
         }
