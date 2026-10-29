@@ -107,11 +107,26 @@ function inreview_dir() {
     if (!is_dir($d)) { @mkdir($d, 0777, true); @file_put_contents($d . '.htaccess', "Require all denied\n"); }
     return $d;
 }
+// config.local.php を一度だけ読み込んで配列で返す（各所の重複読み込みを共通化）
+function local_config() {
+    static $cfg = null;
+    if ($cfg === null) {
+        $p = __DIR__ . '/config.local.php';
+        $c = is_file($p) ? require $p : null;
+        $cfg = is_array($c) ? $c : [];
+    }
+    return $cfg;
+}
+// 原稿/校正の作成者本人か（owner meta の email とログイン email が一致）
+function is_owner($owner, $me) {
+    if (!is_array($owner) || !$me) return false;
+    $oe = strtolower(trim($owner['email'] ?? ''));
+    return $oe !== '' && $oe === strtolower(trim($me['email'] ?? ''));
+}
+
 // pr↔LabPay サーバ間共通シークレット（config.local.php の pr_integration.shared_secret）
 function read_pr_secret() {
-    $cfg = __DIR__ . '/config.local.php';
-    if (is_file($cfg)) { $c = require $cfg; if (is_array($c)) return (string)($c['pr_integration']['shared_secret'] ?? ''); }
-    return '';
+    return (string)(local_config()['pr_integration']['shared_secret'] ?? '');
 }
 function verify_pr_secret() {
     $secret = read_pr_secret();
@@ -283,9 +298,25 @@ function list_shared_reviews($filesDir, $me) {
 
 // OpenAI キー（サーバのみの config.local.php）
 function read_openai_key() {
-    $cfg = __DIR__ . '/config.local.php';
-    if (is_file($cfg)) { $c = require $cfg; if (is_array($c)) return $c['openai_key'] ?? ''; }
-    return '';
+    return local_config()['openai_key'] ?? '';
+}
+
+// OpenAI Chat Completions への POST。[httpコード, 本文] を返す（タイトル抽出・AI査読で共用）。
+function openai_chat($payload, $timeout = 60) {
+    $key = read_openai_key();
+    if ($key === '') return [500, '{"error":"no key"}'];
+    $ch = curl_init('https://api.openai.com/v1/chat/completions');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $key, 'Content-Type: application/json'],
+        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => $timeout,
+    ]);
+    $resp = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return [$code, (string)$resp];
 }
 
 // pr内依頼のイベントを LabPay の汎用通知受け口 /api/incoming-notify へ送る（LabPay v1434）。
@@ -293,9 +324,9 @@ function read_openai_key() {
 // 送信先URLと Bearer シークレットは config.local.php の labpay_event_url / labpay_event_secret。
 // 未設定なら何もしない。サーバ間POSTでCORS無関係・best-effort（失敗しても本処理は止めない）。
 function notify_labpay($payload) {
-    $cfg = __DIR__ . '/config.local.php';
-    $url = ''; $secret = '';
-    if (is_file($cfg)) { $c = require $cfg; if (is_array($c)) { $url = (string)($c['labpay_event_url'] ?? ''); $secret = (string)($c['labpay_event_secret'] ?? ''); } }
+    $c = local_config();
+    $url = (string)($c['labpay_event_url'] ?? '');
+    $secret = (string)($c['labpay_event_secret'] ?? '');
     if ($url === '' || $secret === '' || strtolower((string)parse_url($url, PHP_URL_HOST)) !== 'pay.nkmr.io') return;
     $ch = curl_init($url);
     curl_setopt_array($ch, [
@@ -349,9 +380,7 @@ function pdf_to_text($pdfPath) {
     return is_string($out) ? trim($out) : '';
 }
 function openai_review($text) {
-    $key = read_openai_key();
-    if ($key === '') return [500, '{"error":"no key"}'];
-    $payload = [
+    return openai_chat([
         'model'           => 'gpt-4o',
         'temperature'     => 0.2,
         'response_format' => ['type' => 'json_object'],
@@ -359,19 +388,7 @@ function openai_review($text) {
             ['role' => 'system', 'content' => review_system_prompt()],
             ['role' => 'user',   'content' => mb_substr($text, 0, 48000)],
         ],
-    ];
-    $ch = curl_init('https://api.openai.com/v1/chat/completions');
-    curl_setopt_array($ch, [
-        CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $key, 'Content-Type: application/json'],
-        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 180,
-    ]);
-    $resp = curl_exec($ch);
-    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    return [$code, (string)$resp];
+    ], 180);
 }
 
 // 所有者meta のタイトルだけ更新（他フィールドは温存）
@@ -387,10 +404,8 @@ function update_owner_title($uuid, $title) {
 function openai_extract_title($text) {
     $text = trim((string)$text);
     if ($text === '') return '';
-    $key = read_openai_key();
-    if ($key === '') return '';
 
-    $payload = [
+    list($code, $resp) = openai_chat([
         'model'       => 'gpt-4o-mini',
         'temperature' => 0,
         'max_tokens'  => 80,
@@ -398,19 +413,8 @@ function openai_extract_title($text) {
             ['role' => 'system', 'content' => 'あなたは文書のメタデータ抽出器です。与えられた1ページ目のテキストから、その文書（論文・レポート等）のタイトルだけを1行で返してください。前置き・引用符・説明は不要。タイトルが判別できなければ空文字を返してください。'],
             ['role' => 'user', 'content' => mb_substr($text, 0, 4000)],
         ],
-    ];
-    $ch = curl_init('https://api.openai.com/v1/chat/completions');
-    curl_setopt_array($ch, [
-        CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $key, 'Content-Type: application/json'],
-        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 30,
-    ]);
-    $resp = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    if ($resp === false || $code < 200 || $code >= 300) return '';
+    ], 30);
+    if ($code < 200 || $code >= 300) return '';
 
     $d = json_decode($resp, true);
     $t = $d['choices'][0]['message']['content'] ?? '';
@@ -484,8 +488,7 @@ if ($method === 'POST') {
             $uuid = $input['uuid'] ?? '';
             if (!is_valid_uuid($uuid)) json_error('Invalid uuid');
             $owner = read_owner($uuid);
-            $amOwner = is_array($owner) && strtolower(trim($me['email'] ?? '')) === strtolower(trim($owner['email'] ?? '')) && ($owner['email'] ?? '') !== '';
-            if (!$amOwner) json_error('作成者のみ設定できます', 403);
+            if (!is_owner($owner, $me)) json_error('作成者のみ設定できます', 403);
 
             $clean = [];
             foreach ((array)($input['recipients'] ?? []) as $r) {
@@ -508,8 +511,7 @@ if ($method === 'POST') {
             $uuid = $input['uuid'] ?? '';
             if (!is_valid_uuid($uuid)) json_error('Invalid uuid');
             $owner = read_owner($uuid);
-            $amOwner = is_array($owner) && strtolower(trim($me['email'] ?? '')) === strtolower(trim($owner['email'] ?? '')) && ($owner['email'] ?? '') !== '';
-            if (!$amOwner) json_error('原稿のアップロード者のみ依頼できます', 403);
+            if (!is_owner($owner, $me)) json_error('原稿のアップロード者のみ依頼できます', 403);
 
             $reviewers = [];
             foreach ((array)($input['reviewers'] ?? []) as $r) {
@@ -598,8 +600,7 @@ if ($method === 'POST') {
             if (!is_valid_uuid($uuid)) json_error('Invalid uuid');
             $o = read_owner($uuid);
             if (!is_array($o)) json_error('依頼が見つかりません', 404);
-            $amOwner = strtolower(trim($me['email'] ?? '')) === strtolower(trim($o['email'] ?? '')) && ($o['email'] ?? '') !== '';
-            if (!$amOwner) json_error('依頼者のみ取り下げできます', 403);
+            if (!is_owner($o, $me)) json_error('依頼者のみ取り下げできます', 403);
             if (isset($o['review_request'])) {
                 unset($o['review_request']);
                 meta_put(owner_path($uuid), json_encode($o, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
@@ -925,7 +926,7 @@ if ($method === 'GET' && isset($_GET['uuid'])) {
         $owner = read_owner($uuid);
         $recipients = (is_array($owner) && is_array($owner['recipients'] ?? null)) ? $owner['recipients'] : [];
         $restricted = (is_array($owner) && array_key_exists('restricted', $owner)) ? (bool)$owner['restricted'] : !empty($recipients);
-        $isOwner = ($me && is_array($owner) && strtolower(trim($me['email'] ?? '')) === strtolower(trim($owner['email'] ?? '')) && ($owner['email'] ?? '') !== '');
+        $isOwner = is_owner($owner, $me);
         if (!empty($recipients) && $restricted) {
             $allowed = $isOwner || ($me && in_array($me['user'] ?? '', $recipients, true));
             if (!$allowed) {
