@@ -3,7 +3,8 @@ import { undoLast } from './drawingHandler.js';
 import { updateButtons, toggleDrawingMode, initFileInputButton } from './UIHandler.js';
 import { extractUUID } from './subModule.js';
 import { bindInputModeUI, syncStateFromCheckboxes, loadInputSettings, keydownEvent,
-         bindTouchModeUI, loadTouchMode, initDeviceInputUI, attachEdgeSwipeNav } from './inputHandler.js';
+         bindTouchModeUI, loadTouchMode, initDeviceInputUI, attachEdgeSwipeNav,
+         loadPenOnly, bindPenOnlyUI } from './inputHandler.js';
 import { appState } from './appState.js';
 import { loadDataFromServer, importZipFile, deleteReviewFromServer } from './storageHandler.js';
 import { startRecordingOnServer, startRecordingOnLocal, stopRecording, togglePauseRecording } from './recordingHandler.js';
@@ -114,6 +115,10 @@ if (hudEnabled()) {
 loadInputSettings();
 syncStateFromCheckboxes();
 bindInputModeUI();
+
+// ペン優先モード（手をついても書ける）の読込＋トグル配線
+loadPenOnly();
+bindPenOnlyUI();
 
 // スマホ用「移動/手書き」切替（PC/iPadでは非表示・無効）
 loadTouchMode();

@@ -127,6 +127,8 @@ export function attachPointerDrawing(_pdfSVG){
       abortGesture();
     }
     hud(`DN ${e.pointerType[0]} id=${e.pointerId} p=${(e.pressure||0).toFixed(2)} act=${activePointerId} g=${appState.gesturing?1:0}`);
+    // ペン優先モード：指は一切使わない（描画もジェスチャも。手をついても誤爆しない）。ペンは通す。
+    if (appState.penOnly && e.pointerType === 'touch') { hud('  blk penOnly'); return; }
     if (!appState.isCheckerMode) return;
     if (appState.isPaused) return;            // 一時停止中は描かない
     if (appState.gesturing && e.pointerType !== 'pen') return;   // 2本指ジェスチャ中はタッチ描画しない（ペンは上で解除済み）
@@ -176,6 +178,7 @@ export function attachPointerDrawing(_pdfSVG){
 
   const onMove = (e) => {
     if (e.pointerType === 'pen') appState.penActiveUntil = performance.now() + PEN_GRACE_MS;  // palm rejection用
+    if (appState.penOnly && e.pointerType === 'touch') return;   // ペン優先：指は無視
     if (!appState.isCheckerMode) return;
 
     // 取りこぼし保険：ペンが押下中(pressure>0 or buttons)なのに描画が始まっていなければ、
@@ -230,6 +233,7 @@ export function attachPointerDrawing(_pdfSVG){
 
     hud(`${e.type.slice(7,9).toUpperCase()} ${e.pointerType[0]} id=${e.pointerId} act=${activePointerId}`);
     if (!appState.isCheckerMode) return;
+    if (appState.penOnly && e.pointerType === 'touch') return;   // ペン優先：指は無視
     if (!isAllowedPointer(e)) return;
 
     // ★核：activePointerId 以外のup/cancel/lostは無視
@@ -272,7 +276,7 @@ export function attachEdgeSwipeNav(svg){
   let active = null;          // {id, x0, y0, t0}
   let touchCount = 0;
 
-  const usable = () => appState.isCheckerMode && !appState.inputMode.touch && !!pdfDoc;
+  const usable = () => appState.isCheckerMode && !appState.inputMode.touch && !appState.penOnly && !!pdfDoc;
   const penActive = () => performance.now() < (appState.penActiveUntil || 0);
 
   svg.addEventListener('pointerdown', (e) => {
@@ -318,6 +322,23 @@ export function bindInputModeUI(){
       console.log(appState.inputMode);
       localStorage.setItem('inputMode', JSON.stringify(appState.inputMode));
     });
+  });
+}
+
+// ===== ペン優先モード（手をついても書ける：ONの間は指を完全に無視）=====
+// 描画・ピンチ・横スワイプの全タッチ処理を切る。ページ送りは＜前 次＞ボタン/矢印キーで。
+export function loadPenOnly(){
+  const on = localStorage.getItem('penOnly') === '1';
+  appState.penOnly = on;
+  document.getElementById('penOnly')?.classList.toggle('active', on);
+}
+export function bindPenOnlyUI(){
+  const b = document.getElementById('penOnly');
+  if (!b) return;
+  b.addEventListener('click', () => {
+    appState.penOnly = !appState.penOnly;
+    b.classList.toggle('active', appState.penOnly);
+    localStorage.setItem('penOnly', appState.penOnly ? '1' : '0');
   });
 }
 

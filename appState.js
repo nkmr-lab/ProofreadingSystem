@@ -14,6 +14,7 @@ export const appState = {
     touchMode: 'auto',
     gesturing: false,   // 2本指ピンチ/パン中は手書きを止める
     penActiveUntil: 0,  // ペン(Apple Pencil)筆記中＋直後のタッチ無視(palm rejection)。performance.now()基準
+    penOnly: false,     // ペン優先モード：ONの間は指(touch)を完全に無視（描画/ピンチ/横スワイプ全部切る）。手をついても確実に書ける。ページは＜前 次＞で
     loggedIn: false,
     reviewCb: null,     // LabPay校閲連携: {cb, cbt} 保存成功時に結果URLを返す
     uuid: null,
