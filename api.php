@@ -459,12 +459,13 @@ if ($method === 'POST') {
             // 「誰が誰の原稿を完了したか」を LabPay → 依頼者本人へ(in-app/DM)＋#labpay へ（pr内依頼のみ）。
             // 依頼者＝原稿所有者のメールは pr が持っているので to_emails に入れられる。
             $reqEmail = trim((string)($o['email'] ?? ''));
+            $reqName  = trim((string)($o['name'] ?? '')); if ($reqName === '') $reqName = '依頼者';
             $revName  = trim((string)($me['name'] ?? $me['user'] ?? '')); if ($revName === '') $revName = 'レビュアー';
             $docTitle = trim((string)($o['title'] ?? '')); if ($docTitle === '') $docTitle = '(無題のPDF)';
             notify_labpay([
                 'source'        => 'pr.nkmr.io',
                 'to_emails'     => ($reqEmail !== '' ? [$reqEmail] : []),
-                'body'          => "✅ {$revName} さんが原稿『{$docTitle}』をチェックしました\n→ https://pr.nkmr.io/{$result}",
+                'body'          => "✅ {$revName} さんが {$reqName} さんから依頼された原稿『{$docTitle}』をチェックしました\n→ https://pr.nkmr.io/{$result}",
                 'slack_channel' => '#labpay',
             ]);
             echo json_encode(['status' => 'success']);
