@@ -1,12 +1,13 @@
 // transcriptHandler.js — OpenAI Whisper の文字起こしを同期字幕として表示（研究室ログイン限定）。
 // 行クリックでその時刻へジャンプ、再生中は現在行をハイライト＆自動スクロール。
 import { appState } from './appState.js';
-import { escapeHtml } from './subModule.js';
+import { escapeHtml, makePanel } from './subModule.js';
 
 let segments = [];
 let audioEl = null;
 let listEl = null;
 let panelEl = null;
+let panel = null;      // makePanel(show/toggle)
 let btnEl = null;
 let curIdx = -1;
 let synced = false;
@@ -17,11 +18,12 @@ function fmt(t){
 }
 export function initTranscriptUI(){
   panelEl = document.getElementById('transcriptPanel');
+  panel   = makePanel(panelEl, 't-open');
   listEl  = document.getElementById('transcriptList');
   btnEl   = document.getElementById('genTranscript');
   if (btnEl) btnEl.addEventListener('click', onButton);
   const closeBtn = document.getElementById('transcriptClose');
-  if (closeBtn) closeBtn.addEventListener('click', () => showPanel(false));
+  if (closeBtn) closeBtn.addEventListener('click', () => panel.show(false));
   const regenBtn = document.getElementById('transcriptRegen');
   if (regenBtn) regenBtn.addEventListener('click', () => {
     if (confirm('文字起こしをやり直します（APIを再度呼びます）。よろしいですか？')) generate(true);
@@ -40,7 +42,7 @@ export async function loadTranscript(uuid){
       segments = data.segments;
       renderCaptions();
       btnEl.textContent = '📝 文字起こし';
-      showPanel(true);                 // 既定で字幕を表示（音声なしでも読める。✕で閉じられる）
+      panel.show(true);                 // 既定で字幕を表示（音声なしでも読める。✕で閉じられる）
     } else {
       btnEl.textContent = '📝 文字起こし';   // 未生成：押すと生成
     }
@@ -50,7 +52,7 @@ export async function loadTranscript(uuid){
 }
 
 async function onButton(){
-  if (segments.length){ togglePanel(); return; }   // 生成済み→表示切替
+  if (segments.length){ panel.toggle(); return; }   // 生成済み→表示切替
   await generate();                                 // 未生成→生成
 }
 
@@ -72,7 +74,7 @@ async function generate(force = false){
     segments = data.segments || [];
     renderCaptions();
     btnEl.textContent = '📝 文字起こし';
-    showPanel(true);
+    panel.show(true);
   } catch (e) {
     alert('文字起こしに失敗: ' + (e.message || e));
     btnEl.textContent = old;
@@ -119,5 +121,3 @@ function highlight(){
   }
 }
 
-function showPanel(v){ if (panelEl) panelEl.style.display = v ? '' : 'none'; document.body.classList.toggle('t-open', !!(v && panelEl)); }
-function togglePanel(){ if (panelEl) showPanel(panelEl.style.display === 'none'); }

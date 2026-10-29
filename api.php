@@ -107,16 +107,9 @@ function inreview_dir() {
     if (!is_dir($d)) { @mkdir($d, 0777, true); @file_put_contents($d . '.htaccess', "Require all denied\n"); }
     return $d;
 }
-// config.local.php を一度だけ読み込んで配列で返す（各所の重複読み込みを共通化）
-function local_config() {
-    static $cfg = null;
-    if ($cfg === null) {
-        $p = __DIR__ . '/config.local.php';
-        $c = is_file($p) ? require $p : null;
-        $cfg = is_array($c) ? $c : [];
-    }
-    return $cfg;
-}
+// config.local.php の読み込み（local_config）は config_util.php に集約（transcribe.php と共用）
+require_once __DIR__ . '/config_util.php';
+
 // 原稿/校正の作成者本人か（owner meta の email とログイン email が一致）
 function is_owner($owner, $me) {
     if (!is_array($owner) || !$me) return false;

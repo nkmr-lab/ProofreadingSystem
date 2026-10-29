@@ -2,19 +2,20 @@
 // 原稿PDFをサーバで pdftotext→gpt-4o に通し、構造化レビュー(要約/良い点/改善点/チェックリスト/総評/判定)を
 // 文字起こしの隣に表示する。api.php の ai_review(GET=キャッシュ取得 / POST=生成) を使う。
 import { appState } from './appState.js';
-import { escapeHtml } from './subModule.js';
+import { escapeHtml, makePanel } from './subModule.js';
 
-let panelEl = null, bodyEl = null, btnEl = null;
+let panelEl = null, bodyEl = null, btnEl = null, panel = null;
 let reviewData = null, loaded = false;
 
 function nl2br(s){ return escapeHtml(s).replace(/\n/g, '<br>'); }
 
 export function initReviewUI(){
   panelEl = document.getElementById('reviewPanel');
+  panel   = makePanel(panelEl, 'r-open');
   bodyEl  = document.getElementById('reviewBody');
   btnEl   = document.getElementById('genReview');
   if (btnEl) btnEl.addEventListener('click', onButton);
-  document.getElementById('reviewClose')?.addEventListener('click', () => showPanel(false));
+  document.getElementById('reviewClose')?.addEventListener('click', () => panel.show(false));
   document.getElementById('reviewRegen')?.addEventListener('click', () => {
     if (confirm('AI査読をやり直します（APIを再度呼びます）。よろしいですか？')) generate(true);
   });
@@ -35,7 +36,7 @@ export async function loadReview(uuid){
 }
 
 async function onButton(){
-  if (loaded){ togglePanel(); return; }   // 生成済み→表示切替
+  if (loaded){ panel.toggle(); return; }   // 生成済み→表示切替
   await generate();                        // 未生成→生成
 }
 
@@ -55,7 +56,7 @@ async function generate(force = false){
     if (d.status !== 'success' || !d.review) throw new Error(d.message || '失敗しました');
     reviewData = d.review; loaded = true;
     render();
-    showPanel(true);
+    panel.show(true);
     btnEl.textContent = '🧐 AI査読';
   } catch (e) {
     alert('AI査読に失敗: ' + (e.message || e));
@@ -83,9 +84,3 @@ function render(){
   h += `<div class="rv-meta">⚠️ AIによる自動査読です。参考情報として確認してください。</div>`;
   bodyEl.innerHTML = h;
 }
-
-function showPanel(v){
-  if (panelEl) panelEl.style.display = v ? '' : 'none';
-  document.body.classList.toggle('r-open', !!(v && panelEl));
-}
-function togglePanel(){ if (panelEl) showPanel(panelEl.style.display === 'none'); }

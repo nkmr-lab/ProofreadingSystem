@@ -12,6 +12,7 @@
 // APIキーは公開リポジトリに置かない → サーバのみの config.local.php から読む。
 header('Content-Type: application/json');
 require_once __DIR__ . '/nkmrauth.php';
+require_once __DIR__ . '/config_util.php';   // local_config()（api.phpと共用）
 
 // 研究室ログイン限定
 $me = nkmrauth_identity();
@@ -255,10 +256,9 @@ if ($method === 'POST') {
         if (is_array($raw)) respond_from_raw($raw, $me);
     }
 
-    $OPENAI_KEY = '';
-    $WHISPER_PROMPT = '';
-    $cfg = __DIR__ . '/config.local.php';
-    if (is_file($cfg)) { $c = require $cfg; if (is_array($c)) { $OPENAI_KEY = $c['openai_key'] ?? ''; $WHISPER_PROMPT = (string)($c['whisper_prompt'] ?? ''); } }
+    $cfg = local_config();
+    $OPENAI_KEY = (string)($cfg['openai_key'] ?? '');
+    $WHISPER_PROMPT = (string)($cfg['whisper_prompt'] ?? '');
     if ($OPENAI_KEY === '') j_err('OpenAI APIキーが未設定です（サーバ管理者に config.local.php の設定を依頼してください）', 500);
     // 語彙・句読点をバイアスして精度を上げるプロンプト（config.local.php の whisper_prompt で上書き可）。
     if ($WHISPER_PROMPT === '') {

@@ -3,6 +3,28 @@ export function escapeHtml(s){
     return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// api.php への JSON POST（成功以外は例外）。各所の定型 fetch を共通化。
+export async function apiPost(body){
+    const r = await fetch('api.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || d.status !== 'success') throw new Error(d.message || `失敗しました (${r.status})`);
+    return d;
+}
+
+// 下部パネル（文字起こし/査読）の表示制御を共通化。bodyClass は左右分割用（t-open/r-open）。
+export function makePanel(panelEl, bodyClass){
+    const show = (v) => {
+        if (panelEl) panelEl.style.display = v ? '' : 'none';
+        document.body.classList.toggle(bodyClass, !!(v && panelEl));
+    };
+    const toggle = () => { if (panelEl) show(panelEl.style.display === 'none'); };
+    return { show, toggle };
+}
+
 // 研究室メンバー一覧（共有・依頼ピッカー用）。requestHandler/shareHandler で重複していたのを共通化。
 export const GRADE_ORDER = ['教員', 'D3', 'D2', 'D1', 'M2', 'M1', 'B4', 'B3', 'B2', 'B1'];
 let _rosterCache = null;

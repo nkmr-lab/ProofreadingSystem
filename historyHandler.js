@@ -1,7 +1,7 @@
 // historyHandler.js — ホームで「自分がチェックした校正」を新しい順に一覧（ログイン限定）。
 // api.php?action=mine（所有者=自分の meta を走査）から取得し、/{uuid} へのリンクを並べる。
 
-import { escapeHtml } from './subModule.js';
+import { escapeHtml, apiPost } from './subModule.js';
 
 // ISO文字列 → ローカルの読みやすい日時
 function fmtDate(iso){
@@ -133,18 +133,6 @@ function bindHistMenuGlobalClose(){
   if (histMenuBound) return;
   histMenuBound = true;
   document.addEventListener('click', () => closeAllHistMenus());
-}
-
-// api.php への JSON POST（成功以外は例外）
-async function apiPost(body){
-  const r = await fetch('api.php', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok || d.status !== 'success') throw new Error(d.message || `失敗しました (${r.status})`);
-  return d;
 }
 
 // 名前の先頭1文字（絵文字・サロゲートも1文字として安全に取り出す）
