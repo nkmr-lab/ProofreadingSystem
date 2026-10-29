@@ -348,6 +348,34 @@ body.is-phone #inputModeBox{ display:none !important; }
   body.t-open.r-open #reviewPanel{ left:50%; }
 }
 
+/* ===== 静的モード：ページ一覧（書き込み込みサムネ） ===== */
+#staticPanel{
+  position:fixed; top:52px; right:0; bottom:0; width:192px; z-index:55;
+  background:var(--surface); border-left:1px solid var(--border);
+  box-shadow:-8px 0 24px rgba(16,24,40,.12);
+  display:flex; flex-direction:column;
+}
+.static-head{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:8px 10px; font-size:12px; font-weight:600; color:var(--muted);
+  border-bottom:1px solid var(--border);
+}
+#staticThumbs{ overflow-y:auto; padding:8px; display:flex; flex-direction:column; gap:8px; -webkit-overflow-scrolling:touch; }
+.static-thumb{ cursor:pointer; border:2px solid transparent; border-radius:8px; padding:3px; background:#f7f8fa; text-align:center; }
+.static-thumb:hover{ border-color:var(--border-strong); }
+.static-thumb.active{ border-color:var(--accent); background:#eef2ff; }
+.static-thumb canvas{ width:100%; height:auto; display:block; border-radius:4px; background:#fff; box-shadow:var(--shadow-sm); }
+.static-thumb-n{ font-size:11px; color:var(--muted); margin-top:2px; font-variant-numeric:tabular-nums; }
+.static-loading{ font-size:12px; color:var(--muted); padding:10px; }
+@media (min-width:641px){
+  body.static-open #pdf-container{ padding-right:192px; }
+}
+@media (max-width:640px){
+  #staticPanel{ top:auto; left:0; right:0; bottom:0; width:auto; height:142px; border-left:none; border-top:1px solid var(--border); box-shadow:0 -8px 24px rgba(16,24,40,.12); }
+  #staticThumbs{ flex-direction:row; }
+  .static-thumb{ flex:0 0 auto; width:96px; }
+}
+
 /* ===== 補助クラス ===== */
 .hidden-file-input{ display:none; }
 .hidden{ display:none; }

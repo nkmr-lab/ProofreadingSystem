@@ -316,8 +316,9 @@ export function renderPageAsync(_num) {
       await swapInBackgroundUrl(url);
 
       appState.isRendering = false;
-      if (appState.isCheckerMode) redrawVisibleNow();
+      if (appState.isCheckerMode || appState.staticMode) redrawVisibleNow();   // 静的モードは全書き込みを表示
       updateButtons();
+      try { document.dispatchEvent(new CustomEvent('pr:pagerendered', { detail: _num })); } catch {}
       return true;
     }).catch((err) => {
       console.error("Error rendering page: ", err);

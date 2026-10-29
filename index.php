@@ -31,13 +31,14 @@ $logoutUrl = nkmrauth_logout_url();
 <button id="shareReview" class="btn btn--primary" style="display:none;">🔗 共有</button>
 <button id="deleteReview" class="btn btn--danger" style="display:none;">🗑️削除</button>
 <button id="downloadPdf" class="btn btn--neutral" style="display:none;" title="表示中のPDFをダウンロード">⬇️ PDF</button>
-<div id="speedButtons" class="speedButtons">
-    再生速度：
+<button id="speedToggle" class="btn btn--neutral" style="display:none;" title="再生速度を変える">⏩ 再生速度</button>
+<div id="speedButtons" class="speedButtons" style="display:none;">
     <button type="button" class="btn speedBtn" data-rate="1.0">×1.0</button>
     <button type="button" class="btn speedBtn" data-rate="1.2">×1.2</button>
     <button type="button" class="btn speedBtn" data-rate="1.5">×1.5</button>
     <button type="button" class="btn speedBtn" data-rate="2.0">×2.0</button>
 </div>
+<button id="staticMode" class="btn btn--neutral" style="display:none;" title="静的モード（全ページの書き込みを一覧）">📄 静的モード</button>
 
 <button id="skipSilence" class="btn speedBtn" title="喋っていない区間を自動で飛ばす" style="display:none;">⏭️ 無音スキップ</button>
 <?php if ($me): // 文字起こし・AI査読は研究室ログイン限定 ?>
@@ -134,6 +135,15 @@ $logoutUrl = nkmrauth_logout_url();
   <div id="reviewBody"></div>
 </div>
 <?php endif; ?>
+
+<!-- 静的モードのページ一覧（書き込み込みサムネ）。閲覧者全員に出せるので $me 外。 -->
+<div id="staticPanel" style="display:none;">
+  <div class="static-head">
+    <span>📄 ページ一覧（書き込み込み・タップで移動）</span>
+    <button id="staticClose" class="btn btn--icon" title="静的モードを閉じる">✕</button>
+  </div>
+  <div id="staticThumbs"></div>
+</div>
 
 <div id="pdf-container">
     <svg id="pdfSVG" width="100%" height="100%"></svg>

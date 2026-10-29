@@ -20,6 +20,7 @@ export const appState = {
     reqUuid: null,      // チェック依頼としてレビュー中なら、その依頼(原稿)のuuid。保存時に request_done で紐づけ
     viewOnly: false,    // 依頼原稿を閲覧のみで開いている（被依頼者でない研究室メンバー）。録音/手書き不可
     pdfUrl: null,       // 閲覧中PDFのダウンロード用URL（ビューアはFileを持たないのでURLで配る）
+    staticMode: false,  // 静的モード（校正の全書き込みをページ単位で表示・サムネ一覧）
 
     mrKey: null,        // LabPay作業中タスク(review_id_reviewer_row_id)としてレビュー中なら、保存後 inreview_done で消す
     isOwner: false,     // 閲覧中の校正の作成者本人か（共有相手の設定可否）

@@ -9,16 +9,13 @@ function setDashboardHidden(hidden) {
 }
 
 export function updateButtons() {
+    // 速度トグル/静的モードは閲覧時のみ。既定は隠し、閲覧ブランチで出す。
+    setHidden('speedToggle', true);
+    setHidden('staticMode', true);
     if( appState.isCheckerMode == false ){
         setDashboardHidden(true);   // 閲覧時はダッシュボードを隠す
-        // 学生側：ページボタンも描画もundoも不要（＝触らせない）
-        setHidden('speedButtons', false);
-        setHidden('audioPlayer', false);
-        setHidden('skipSilence', false);   // 無音スキップは閲覧時のみ
-        setHidden('shareReview', !appState.isOwner);   // 共有ボタンは作成者のみ（外部・非所有者には出さない）
         setHidden('downloadPdf', false);   // PDFダウンロードは閲覧時に出す（共有された校正なのでDL可）
-        setHidden('prev-page', true);
-        setHidden('next-page', true);
+        setHidden('staticMode', false);    // 静的モードボタンは閲覧時に出す
         setHidden('drawing-mode', true);
         setHidden('undo', true);
         setHidden('recordServer', true);
@@ -32,13 +29,31 @@ export function updateButtons() {
         setHidden('pdfControls', true);
         setHidden('description', true);
         setHidden('pdf-container', false);
-
-        setDisabled('prev-page', true);
-        setDisabled('next-page', true);
         setDisabled('drawing-mode', true);
         setDisabled('undo', true);
 
-        initPlaybackSpeedUI();
+        if (appState.staticMode){
+            // 静的モード：全書き込み表示＋ページ移動＋サムネ一覧。再生系は隠す。
+            setHidden('audioPlayer', true);
+            setHidden('speedButtons', true);
+            setHidden('skipSilence', true);
+            setHidden('shareReview', true);
+            setHidden('prev-page', false);
+            setHidden('next-page', false);
+            setDisabled('prev-page', appState.currentPageNum <= 1);
+            setDisabled('next-page', !pdfDoc || appState.currentPageNum >= pdfDoc.numPages);
+        } else {
+            // 通常の再生ビュー（速度ボタン群は「再生速度」トグルで出す＝ここでは触らない）
+            setHidden('audioPlayer', false);
+            setHidden('speedToggle', false);
+            setHidden('skipSilence', false);
+            setHidden('shareReview', !appState.isOwner);   // 共有は作成者のみ
+            setHidden('prev-page', true);
+            setHidden('next-page', true);
+            setDisabled('prev-page', true);
+            setDisabled('next-page', true);
+            initPlaybackSpeedUI();
+        }
     } else {
         if(pdfDoc){
             document.body.style.overflow = "hidden";

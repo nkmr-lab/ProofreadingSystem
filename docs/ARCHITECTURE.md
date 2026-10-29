@@ -87,6 +87,7 @@ pr.nkmr.io — PDF原稿を「音声＋手書き」で校正して返すツー�
 - **transcriptHandler.js** … 文字起こしパネル（同期字幕・行タップで頭出し）。
 - **reviewHandler.js** … AI査読パネル。
 - **silenceHandler.js** … 無音スキップ再生。
+- **staticHandler.js** … 静的モード（校正の全書き込みをページ単位で表示＋←→移動＋ペン入りサムネ一覧でページジャンプ）。`appState.staticMode` / `pr:pagerendered` イベントでサムネ追従。
 - **UIHandler.js** … `updateButtons()`＝モード別の表示/非表示の中枢。入力モードUI。
 - **htmlHandler.js** … SVGパス生成、`setHidden/setDisabled`、パスアニメ。
 - **subModule.js** … 共通ユーティリティ: `escapeHtml, apiPost, makePanel, fetchRoster, GRADE_ORDER, extractUUID, calculateMedianPressure, getLocalTimeString`。
