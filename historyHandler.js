@@ -19,6 +19,16 @@ function fmtDateTimeSec(iso){
   const p = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
+// 秒 → 収録の長さ（m:ss、1時間以上は h:mm:ss）
+function fmtDuration(sec){
+  if (!Number.isFinite(sec) || sec < 0) return '';
+  sec = Math.round(sec);
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  const p = n => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${p(m)}:${p(s)}` : `${m}:${p(s)}`;
+}
 // バイト数 → 読みやすいサイズ（同じ原稿か判別する用）
 function fmtSize(bytes){
   if (!Number.isFinite(bytes) || bytes <= 0) return '';
@@ -39,9 +49,11 @@ function makeRow(it, deletable = false){
   a.href = '/' + it.uuid;
   const title = it.title && it.title.trim() ? it.title : '(無題のPDF)';
   const who = it.owner ? `${escapeHtml(it.owner)}・` : '';
+  const dur = fmtDuration(it.durationSec);
+  const mic = it.hasAudio ? (dur ? `🎙️ ${escapeHtml(dur)} ・ ` : '🎙️ ') : '';
   a.innerHTML =
     `<span class="hist-title">${escapeHtml(title)}</span>` +
-    `<span class="hist-meta">${it.hasAudio ? '🎙️ ' : ''}${who}${escapeHtml(fmtDate(it.created))}</span>`;
+    `<span class="hist-meta">${mic}${who}${escapeHtml(fmtDate(it.created))}</span>`;
   row.appendChild(a);
   if (deletable){
     // ⋯メニュー（クリックで「録音し直す／削除」を表示）。誤タップで即発火しないようにする。

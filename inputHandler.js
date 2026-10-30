@@ -128,7 +128,9 @@ export function attachPointerDrawing(_pdfSVG){
     }
     hud(`DN ${e.pointerType[0]} id=${e.pointerId} p=${(e.pressure||0).toFixed(2)} act=${activePointerId} g=${appState.gesturing?1:0}`);
     // ペン優先モード：指は一切使わない（描画もジェスチャも。手をついても誤爆しない）。ペンは通す。
-    if (appState.penOnly && e.pointerType === 'touch') { hud('  blk penOnly'); return; }
+    // preventDefault も必ず呼ぶ：手のひらの接触で Safari がスクロール/ジェスチャ判定を始めると、
+    // 進行中ペンに pointercancel が飛んで線が途切れるため、ここで指の既定動作を止めておく。
+    if (appState.penOnly && e.pointerType === 'touch') { e.preventDefault(); hud('  blk penOnly'); return; }
     if (!appState.isCheckerMode) return;
     if (appState.isPaused) return;            // 一時停止中は描かない
     if (appState.gesturing && e.pointerType !== 'pen') return;   // 2本指ジェスチャ中はタッチ描画しない（ペンは上で解除済み）
@@ -178,7 +180,7 @@ export function attachPointerDrawing(_pdfSVG){
 
   const onMove = (e) => {
     if (e.pointerType === 'pen') appState.penActiveUntil = performance.now() + PEN_GRACE_MS;  // palm rejection用
-    if (appState.penOnly && e.pointerType === 'touch') return;   // ペン優先：指は無視
+    if (appState.penOnly && e.pointerType === 'touch') { e.preventDefault(); return; }   // ペン優先：指は無視（既定動作も止める）
     if (!appState.isCheckerMode) return;
 
     // 取りこぼし保険：ペンが押下中(pressure>0 or buttons)なのに描画が始まっていなければ、
@@ -233,7 +235,7 @@ export function attachPointerDrawing(_pdfSVG){
 
     hud(`${e.type.slice(7,9).toUpperCase()} ${e.pointerType[0]} id=${e.pointerId} act=${activePointerId}`);
     if (!appState.isCheckerMode) return;
-    if (appState.penOnly && e.pointerType === 'touch') return;   // ペン優先：指は無視
+    if (appState.penOnly && e.pointerType === 'touch') { e.preventDefault(); return; }   // ペン優先：指は無視（既定動作も止める）
     if (!isAllowedPointer(e)) return;
 
     // ★核：activePointerId 以外のup/cancel/lostは無視
@@ -254,7 +256,12 @@ export function attachPointerDrawing(_pdfSVG){
   _pdfSVG.addEventListener('pointermove', onMove, { passive:false });
   _pdfSVG.addEventListener('pointerup', finish, { passive:false });
   _pdfSVG.addEventListener('pointercancel', finish, { passive:false });
-  _pdfSVG.addEventListener('lostpointercapture', finish, { passive:false });
+  // ★lostpointercapture では finish しない：iPadで手のひらが触れた瞬間などに
+  //   ペンの pointer capture がブラウザ都合で外れることがあり、ペンはまだ画面に
+  //   着いているのに finish→stopDrawing で線が途中終了・分断されていた（＝「手をつくと書けない」）。
+  //   capture が外れても pointermove は SVG 上のペンに届き続けるので、そのまま描き続け、
+  //   終了は pointerup / pointercancel だけで確定する。capture 喪失時の掃除は次のペン降下が奪う。
+  _pdfSVG.addEventListener('lostpointercapture', (e) => { hud(`LPC ${e.pointerType?.[0]||'?'} (ignored)`); }, { passive:true });
 
   _pdfSVG.__ptr = { onDown, onMove, onUp: finish };
 }

@@ -79,6 +79,9 @@ export function updateButtons() {
                 if (rec0) rec0.classList.remove('blink');
                 return;
             }
+            // 入力切替（ペン/指/マウス・ペン優先）は録音/チェック時のみ出す（端末種別はCSSで出し分け）。
+            setHidden('inputModeBox', false);
+            setHidden('touchModeBox', false);
             // ログイン中はサーバ蓄積に一本化（サーバー録音のみ）。
             // 未ログイン/外部はローカル録音のみ＋ログイン誘導ボタン。
             const loggedIn = !!appState.loggedIn;
@@ -148,6 +151,10 @@ export function updateButtons() {
             setHidden('next-page', true);
             setHidden('drawing-mode', true);
             setHidden('undo', true);
+            // ホーム（PDF未読込）は読み込みしかない＝入力切替もホームボタンも不要。
+            setHidden('inputModeBox', true);
+            setHidden('touchModeBox', true);
+            setHidden('homeButton', true);
         }
     }
 }

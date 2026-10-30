@@ -105,6 +105,26 @@ require_once __DIR__ . '/config_util.php';   // local_config()
 require_once __DIR__ . '/pr_access.php';      // is_owner / review_share_settings / can_view_review / is_requested_reviewer
 require_once __DIR__ . '/labpay.php';         // inreview_* / handle_mark_in_review / notify_labpay / read_pr_secret / verify_pr_secret
 
+// uuid の音声収録の長さ(秒)を返す。m4aが無ければ null。
+// MediaRecorderのm4aはfragmented MP4でmvhdに尺が入らないため、ffprobeで実測する。
+// 録音尺は不変なので、初回だけ測って所有者meta($o['audio_dur'])にキャッシュし、以後は即返す。
+// $o は呼び出し側で復号済みの当該metaの配列（キャッシュ読み書きに使う）。
+function audio_duration_sec($filesDir, $u, $o = null) {
+    $p = $filesDir . $u . '.m4a';
+    if (!is_file($p)) return null;
+    if (is_array($o) && isset($o['audio_dur']) && is_numeric($o['audio_dur'])) {
+        return (int)$o['audio_dur'];
+    }
+    $out = @shell_exec('/usr/bin/ffprobe -v error -show_entries format=duration -of default=nk=1:nw=1 ' . escapeshellarg($p));
+    $sec = is_string($out) ? (float)trim($out) : 0.0;
+    $val = $sec > 0 ? (int)round($sec) : null;
+    if ($val !== null && is_array($o)) {   // metaへキャッシュ（他フィールドは温存）
+        $o['audio_dur'] = $val;
+        @meta_put(owner_path($u), json_encode($o, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+    }
+    return $val;
+}
+
 // 現在のユーザーが所有する校正の一覧（新しい順）。meta/{uuid}.json を走査。
 function list_my_reviews($filesDir, $me) {
     $meEmail = strtolower(trim($me['email'] ?? ''));
@@ -124,6 +144,7 @@ function list_my_reviews($filesDir, $me) {
             'title'   => $o['title'] ?? '',
             'created' => $o['created'] ?? '',
             'hasAudio'=> is_file($filesDir . $u . '.m4a'),
+            'durationSec' => audio_duration_sec($filesDir, $u, $o),   // 音声収録の長さ（履歴表示用）
         ];
     }
     usort($items, fn($a, $b) => strcmp($b['created'], $a['created']));
@@ -207,6 +228,7 @@ function list_shared_reviews($filesDir, $me) {
             'created' => $o['created'] ?? '',
             'owner'   => $o['name'] ?? '',
             'hasAudio'=> is_file($filesDir . $u . '.m4a'),
+            'durationSec' => audio_duration_sec($filesDir, $u, $o),   // 音声収録の長さ（履歴表示用）
         ];
     }
     usort($items, fn($a, $b) => strcmp($b['created'], $a['created']));
