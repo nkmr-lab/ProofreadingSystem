@@ -122,6 +122,7 @@ export function attachPointerDrawing(_pdfSVG){
   const onDown = (e) => {
     if (e.pointerType === 'pen') {
       appState.penActiveUntil = performance.now() + PEN_GRACE_MS;  // palm rejection用
+      appState.penDown = true;    // ★ペン接地中は指のピンチ/パン/スワイプを全部殺す（ペン最優先・下のviewport/edgeSwipeが参照）
       // ペン優先：手のひらが2点タッチと誤認されて gesturing が立っていても、
       // ペンが降りたらジェスチャ状態を解除して必ず描けるようにする。
       abortGesture();
@@ -172,7 +173,10 @@ export function attachPointerDrawing(_pdfSVG){
     activePointerId = e.pointerId;
     activePointerType = e.pointerType;
 
-    try { _pdfSVG.setPointerCapture(e.pointerId); } catch {}
+    // ペンはキャプチャしない：iPadで手のひら等の別ポインタが同時にあると、ペンへの
+    // setPointerCapture が pointercancel を誘発して「線が全く出ない」ことがある。
+    // SVGは描画面いっぱいなのでキャプチャ無しでも pointermove/up はペンに届き続ける。
+    if (e.pointerType !== 'pen') { try { _pdfSVG.setPointerCapture(e.pointerId); } catch {} }
 
     hud(`  START ${e.pointerType}`);
     startDrawing(e);
@@ -189,9 +193,10 @@ export function attachPointerDrawing(_pdfSVG){
         !appState.isPaused && appState.inputMode.pen &&
         ((e.pressure > 0) || ((e.buttons & 1) === 1))) {
       abortGesture();
+      appState.penDown = true;
       activePointerId = e.pointerId;
       activePointerType = 'pen';
-      try { _pdfSVG.setPointerCapture(e.pointerId); } catch {}
+      // ペンはキャプチャしない（上の START と同じ理由）
       hud('  MV->START pen (recovered)');
       startDrawing(e);
       return;
@@ -223,6 +228,7 @@ export function attachPointerDrawing(_pdfSVG){
   };
 
   const finish = (e) => {
+    if (e.pointerType === 'pen') appState.penDown = false;   // ★ペンが離れた(up/cancel)→ 指のロック解除
     // スマホ move/auto 中の終了
     if (phoneGesture && e.pointerId === activePointerId) {
       e.preventDefault();
@@ -283,7 +289,7 @@ export function attachEdgeSwipeNav(svg){
   let active = null;          // {id, x0, y0, t0}
   let touchCount = 0;
 
-  const usable = () => appState.isCheckerMode && !appState.inputMode.touch && !appState.penOnly && !!pdfDoc;
+  const usable = () => appState.isCheckerMode && !appState.inputMode.touch && !appState.penOnly && !appState.penDown && !!pdfDoc;
   const penActive = () => performance.now() < (appState.penActiveUntil || 0);
 
   svg.addEventListener('pointerdown', (e) => {

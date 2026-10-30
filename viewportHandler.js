@@ -171,6 +171,7 @@ export function attachViewportGestures(_svg) {
 
   const onDown = (e) => {
     if (e.pointerType !== 'touch') return;
+    if (appState.penDown) return;   // ★ペン接地中は指のピンチ/パンを一切しない（手のひらでズームして座標がズレ、ペンの線が消えるのを防ぐ）
     if (appState.penOnly && appState.isCheckerMode) return;   // ペン優先モード(書く時)：指でのピンチ/パンはしない。閲覧時は常にピンチ可
     // iPadのペン筆記中(＋直後GRACE)のタッチは手のひら等の誤爆とみなし、ズーム/パンに使わない(palm rejection)。
     if (performance.now() < (appState.penActiveUntil || 0)) return;
@@ -185,6 +186,7 @@ export function attachViewportGestures(_svg) {
 
   const onMove = (e) => {
     if (e.pointerType !== 'touch') return;
+    if (appState.penDown) return;   // ★ペン接地中は指のピンチ/パンを一切しない
     if (appState.penOnly && appState.isCheckerMode) return;   // ペン優先モード(書く時)：指でのピンチ/パンはしない。閲覧時は常にピンチ可
     // ★ペン最優先：ペン筆記中(＋直後GRACE)は、手のひら等のタッチでジェスチャを開始/継続しない。
     //   これが無いと、先に触れていた手のひらが少し動いた瞬間にピンチ誤判定→cancelDrawingで
