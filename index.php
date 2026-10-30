@@ -28,10 +28,10 @@ $logoutUrl = nkmrauth_logout_url();
 <body id="bodyContent" data-checker="<?php echo isset($_GET['uuid']) ? '0' : '1'; ?>" data-loggedin="<?php echo $me ? '1' : '0'; ?>">
 <div class="toolbar">
 <input type="button" id='homeButton' class="btn btn--icon" onclick="location.href='/'" value="🏚️">
-<button id="shareReview" class="btn btn--primary" style="display:none;">🔗 共有</button>
-<button id="deleteReview" class="btn btn--danger" style="display:none;">🗑️削除</button>
-<button id="downloadPdf" class="btn btn--neutral" style="display:none;" title="表示中のPDFをダウンロード">⬇️ PDF</button>
-<button id="speedToggle" class="btn btn--neutral" style="display:none;" title="再生速度を変える">⏩ 再生速度</button>
+<button id="shareReview" class="btn btn--primary btn--hoverlabel" style="display:none;" title="共有">🔗<span class="btn-label"> 共有</span></button>
+<button id="deleteReview" class="btn btn--danger btn--hoverlabel" style="display:none;" title="削除">🗑️<span class="btn-label">削除</span></button>
+<button id="downloadPdf" class="btn btn--neutral btn--hoverlabel" style="display:none;" title="表示中のPDFをダウンロード">⬇️<span class="btn-label"> PDF</span></button>
+<button id="speedToggle" class="btn btn--neutral btn--hoverlabel" style="display:none;" title="再生速度を変える">⏩<span class="btn-label"> 再生速度</span></button>
 <div id="speedButtons" class="speedButtons" style="display:none;">
     <button type="button" class="btn speedBtn" data-rate="1.0">×1.0</button>
     <button type="button" class="btn speedBtn" data-rate="1.2">×1.2</button>
