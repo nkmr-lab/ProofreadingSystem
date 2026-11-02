@@ -43,6 +43,26 @@ function norm_text($t) {
     return preg_replace('/[\s、。・,.!?！？]+/u', '', $t);
 }
 
+// gpt-4o-transcribe は静かな音声で同一文を延々と反復する幻聴ループに陥ることがある
+// （例: 24分の録音で「また、この文章は…」が91回）。build_hybrid はこの本文をそのまま
+// 使うため、whisper経路の filter_segments と同じ考えで「文」に割り、直近2文と同一の
+// 正規化本文を畳んで反復を1回に落とす。生キャッシュは温存し描画時に適用＝再課金なし。
+function collapse_repeats($text) {
+    $text = str_replace(["\r\n", "\n", "\r"], '', (string)$text);   // gptの任意改行を除去（文途中改行での誤分割を防ぐ）
+    $sents = preg_split('/(?<=[。！？!?])/u', $text, -1, PREG_SPLIT_NO_EMPTY);
+    if (!is_array($sents) || count($sents) <= 2) return trim($text); // 分割不能/短文はそのまま
+    $out = []; $recent = [];
+    foreach ($sents as $s) {
+        $s = trim($s);
+        if ($s === '') continue;
+        $n = norm_text($s);
+        if ($n === '') continue;
+        if (in_array($n, array_slice($recent, -2), true)) continue;  // 直近2文と同一＝反復として捨てる
+        $out[] = $s; $recent[] = $n;
+    }
+    return implode('', $out);
+}
+
 // 生セグメント配列 → 表示用に間引き＆重複畳み込み
 function filter_segments($raw) {
     $out = [];
@@ -116,6 +136,7 @@ function local_align_end($Ws, $win) {
 }
 
 function build_hybrid($raw, $gptText) {
+    $gptText = collapse_repeats($gptText);           // gptの反復ループ幻聴を畳んでから整列
     $segs = $raw['segments'] ?? [];
     $Gall = preg_split('//u', (string)$gptText, -1, PREG_SPLIT_NO_EMPTY);
     $G = count($Gall);
