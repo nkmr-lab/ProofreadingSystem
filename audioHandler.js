@@ -83,11 +83,7 @@ export async function startMp4Recording(_uuid) {
   if (mimeType) opts.mimeType = mimeType;
 
   mediaRecorder = new MediaRecorder(stream, opts);
-  // lastAudioMime = 
-  mediaRecorder.mimeType || mimeType || 'audio/mp4';
-  // dbg('actual recorder mimeType', mediaRecorder.mimeType);
 
-  // let n = 0;
   mediaRecorder.ondataavailable = (e) => {
     // dbg('dataavailable', ++n, 'size=', e.data?.size, 'type=', e.data?.type);
     if (e.data && e.data.size > 0) audioChunks.push(e.data);
@@ -139,32 +135,6 @@ export async function stopRecordingAndUpload({ allowDownloadOnFail = true } = {}
     }
   }
 }
-
-// function enableLocalAudioFallback() {
-//     const picker = document.getElementById('localAudioPicker');
-//     const input = document.getElementById('audio-file-input');
-//     const audio = document.getElementById('audioPlayer');
-//     if (!picker || !input || !audio) return;
-
-//     picker.style.display = '';
-
-//     input.onchange = () => {
-//         const file = input.files?.[0];
-//         if (!file) return;
-
-//         // 以前の objectURL を解放
-//         if (audio.dataset.objectUrl) URL.revokeObjectURL(audio.dataset.objectUrl);
-
-//         const url = URL.createObjectURL(file);
-//         audio.dataset.objectUrl = url;
-//         audio.src = url;
-//         audio.load();
-
-//         // ローカル音声でも同期は動く
-//         attachAudioSync(audio);
-//         setHidden('localAudioPicker', true);
-//     };
-// }
 
 export async function stopRecordingLocalOnly() {
   dbg('---- stopRecordingLocalOnly called ----');
@@ -268,8 +238,56 @@ export async function setAudioSourceOrFallback(audioUrl) {
         }
     }
 
-    // だめならローカルファイル選択へ
-    // enableLocalAudioFallback();
+    // サーバ音声が再生できない場合はここで終了（以前のローカルファイル選択フォールバックは廃止）。
+}
+
+// ================================
+// クリーン音声トグル（ノイズ除去＋音量調整した .clean.m4a への切替）
+// 既定は元音。切替時は再生位置・速度・再生中かどうかを保持する。
+// 同期(attachAudioSync)や無音スキップは同じ<audio>要素に付いたまま効き続ける
+// （クリーン版は -D 遅延補正済みで元音と同じ尺・時間軸なので currentTime は 1:1）。
+// ================================
+export function setupCleanAudioToggle(originalUrl, cleanUrl){
+    const audio = document.getElementById('audioPlayer');
+    const btn = document.getElementById('cleanAudioToggle');
+    // 表示/非表示は updateButtons() が appState.hasCleanAudio を見て管理する（setHiddenとの二重管理を避ける）
+    appState.hasCleanAudio = !!cleanUrl;
+    if (!audio || !btn) return;
+
+    if (!cleanUrl){                 // クリーン版が無ければ挙動を外す
+        btn.onclick = null;
+        btn.classList.remove('active');
+        return;
+    }
+
+    let useClean = false;
+    const render = () => {
+        btn.classList.toggle('active', useClean);   // .speedBtn.active の選択中スタイルを流用
+        btn.setAttribute('aria-pressed', useClean ? 'true' : 'false');
+        btn.textContent = useClean ? '✨クリーン音声 ON' : '✨クリーン音声';
+        btn.title = useClean ? '元の録音に戻す' : '録音のノイズを抑え、音量を整えた音声に切り替えます';
+    };
+
+    render();
+
+    btn.onclick = () => {
+        useClean = !useClean;
+        const t = audio.currentTime || 0;
+        const wasPlaying = !audio.paused && !audio.ended;
+        const rate = audio.playbackRate || 1;
+
+        audio.src = useClean ? cleanUrl : originalUrl;
+        audio.load();
+
+        const onMeta = () => {
+            audio.removeEventListener('loadedmetadata', onMeta);
+            try { audio.currentTime = t; } catch (_) {}
+            try { audio.playbackRate = rate; } catch (_) {}
+            if (wasPlaying) audio.play().catch(() => {});
+        };
+        audio.addEventListener('loadedmetadata', onMeta, { once: true });
+        render();
+    };
 }
 
 // ================================

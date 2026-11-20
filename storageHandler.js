@@ -2,7 +2,7 @@
 import { updateButtons } from './UIHandler.js';
 import { buildTimelinePayload, loadTimelinePayload, attachAudioSync, applyAtTimeMs } from './timelineHandler.js';
 import { getUploadedPDFFile, setUploadedPDFFile, loadPDF, loadAnnotations } from './pdfHandler.js';
-import { setAudioSourceOrFallback } from './audioHandler.js';
+import { setAudioSourceOrFallback, setupCleanAudioToggle } from './audioHandler.js';
 import { loadSilenceProfile, attachSilenceSkip } from './silenceHandler.js';
 import { loadTranscript } from './transcriptHandler.js';
 import { loadReview } from './reviewHandler.js';
@@ -68,6 +68,9 @@ export async function loadDataFromServer(_uuid){
           applyAtTimeMs(tMs);
       }
 
+      // クリーン音声（ノイズ除去＋音量調整）が生成済みなら切替トグルを出す。無ければ隠す。
+      setupCleanAudioToggle(data.audio, data.audioClean);
+
       // 自分の校正（または所有者未記録の旧データ）なら削除ボタンを出す
       const delBtn = document.getElementById('deleteReview');
       if (delBtn) delBtn.style.display = data.canDelete ? '' : 'none';
@@ -102,17 +105,6 @@ export async function deleteReviewFromServer(_uuid){
     console.error(e);
     alert(e.message || String(e));
   }
-}
-
-export function saveJSON(_paths) {
-    const data = { paths: _paths };
-    const json = JSON.stringify(data);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = (new Date()).toISOString() + '.json';
-    a.click();
 }
 
 export async function saveAnnotations(payloadObject) {

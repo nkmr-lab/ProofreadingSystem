@@ -41,6 +41,7 @@ $logoutUrl = nkmrauth_logout_url();
 <button id="staticMode" class="btn btn--neutral" style="display:none;" title="静的モード（全ページの書き込みを一覧）">📄 静的モード</button>
 
 <button id="skipSilence" class="btn speedBtn" title="喋っていない区間を自動で飛ばす" style="display:none;">⏭️ 無音スキップ</button>
+<button id="cleanAudioToggle" class="btn speedBtn" title="録音のノイズを抑え、音量を整えた音声に切り替えます" style="display:none;">✨クリーン音声</button>
 <?php if ($me): // 文字起こし・AI査読は研究室ログイン限定 ?>
 <button id="genTranscript" class="btn btn--secondary" style="display:none;">📝 文字起こし</button>
 <button id="genReview" class="btn btn--secondary" style="display:none;">🧐 AI査読</button>

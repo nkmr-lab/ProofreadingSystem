@@ -37,6 +37,7 @@ export function updateButtons() {
             setHidden('audioPlayer', true);
             setHidden('speedButtons', true);
             setHidden('skipSilence', true);
+            setHidden('cleanAudioToggle', true);
             setHidden('shareReview', true);
             setHidden('genTranscript', true);   // 文字起こしは静的モード中は出さない
             setHidden('genReview', true);        // AI査読も静的モード中は出さない
@@ -49,6 +50,7 @@ export function updateButtons() {
             setHidden('audioPlayer', false);
             setHidden('speedToggle', false);
             setHidden('skipSilence', false);
+            setHidden('cleanAudioToggle', !appState.hasCleanAudio);   // クリーン版が有るときだけ出す
             setHidden('shareReview', !appState.isOwner);   // 共有は作成者のみ
             setHidden('prev-page', true);
             setHidden('next-page', true);

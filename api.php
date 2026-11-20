@@ -19,7 +19,7 @@ if (!is_dir($targetDir)) {
 }
 
 const MAX_JSON_BYTES  = 10_000_000;   // 10MB
-const MAX_PDF_BYTES   = 50_000_000;  // 25MB
+const MAX_PDF_BYTES   = 50_000_000;   // 50MB
 const MAX_AUDIO_BYTES = 100_000_000;  // 100MB（必要に応じて）
 
 function json_error($msg, $code = 400) {
@@ -86,18 +86,28 @@ function can_delete($uuid, $me) {
     if (!$me) return false;
     $o = read_owner($uuid);
     if (!$o) return true;   // 所有者未記録（旧データ）はログインしていれば可
-    return isset($o['email']) && hash_equals((string)$o['email'], (string)($me['email'] ?? ''));
+    // メール比較は is_owner(pr_access.php) に集約＝大文字小文字・前後空白を正規化。
+    // 旧実装は生メールの hash_equals で、セッション毎にメールの大小表記が揺れると
+    // 本人なのに自分の校正を削除できない事故が起きうるため合わせる。
+    return is_owner($o, $me);
 }
 // uuid に紐づく全ファイルを削除。
+// files/ 側（原稿/校正PDF・録音・クリーン音声・注釈）と meta/ 側（所有者メタ・
+// 文字起こし/査読の各キャッシュ）を漏れなく消す。消し残すと files/ に孤児
+// （特に .clean.m4a は元音が消えた後はワーカーも再生成しないため永久に残る）や
+// meta/ にメール入りキャッシュが残るため、ここで一箇所に集約する。
 function delete_uuid_files($dir, $uuid) {
-    foreach (['pdf', 'json', 'm4a'] as $ext) {
-        $p = safe_path($dir, $uuid, $ext);
+    // files/ 側：拡張子ベタ置き（m4a の派生 .clean.m4a も忘れず）
+    foreach (['pdf', 'json', 'm4a', 'clean.m4a'] as $ext) {
+        $p = $dir . $uuid . '.' . $ext;
         if (is_file($p)) @unlink($p);
     }
-    $op = owner_path($uuid);
-    if (is_file($op)) @unlink($op);
-    $wf = meta_dir() . $uuid . '.whisper.json';   // 文字起こしキャッシュも消す
-    if (is_file($wf)) @unlink($wf);
+    // meta/ 側：所有者メタ＋文字起こし/査読キャッシュ（whisper・gpt・review）
+    $metaDir = meta_dir();
+    foreach (['json', 'whisper.json', 'gpt.json', 'review.json'] as $ext) {
+        $p = $metaDir . $uuid . '.' . $ext;
+        if (is_file($p)) @unlink($p);
+    }
 }
 
 // 共通ヘルパーは別ファイルへ集約（見通しと再利用のため）
@@ -125,19 +135,29 @@ function audio_duration_sec($filesDir, $u, $o = null) {
     return $val;
 }
 
-// 現在のユーザーが所有する校正の一覧（新しい順）。meta/{uuid}.json を走査。
-function list_my_reviews($filesDir, $me) {
-    $meEmail = strtolower(trim($me['email'] ?? ''));
-    $items = [];
+// meta/ の所有者メタを順に読み出すジェネレータ。各 {uuid}.json を1回だけ decode し [uuid, $o] を返す。
+// list_my_reviews / list_requests_* / list_shared_reviews で重複していた
+// 「scandir＋uuid判定＋json_decode＋配列チェック」の定型を一箇所に集約する
+// （絞り込みと出力整形は各関数側に残す＝挙動は不変）。
+function iter_owner_metas() {
     $metaDir = meta_dir();
     foreach (@scandir($metaDir) ?: [] as $fn) {
         if (!preg_match('/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.json$/i', $fn, $m)) continue;
         $o = json_decode(@file_get_contents($metaDir . $fn), true);
         if (!is_array($o)) continue;
-        if (strtolower(trim($o['email'] ?? '')) !== $meEmail || $meEmail === '') continue;
+        yield [$m[1], $o];
+    }
+}
+
+// 現在のユーザーが所有する校正の一覧（新しい順）。meta/{uuid}.json を走査。
+function list_my_reviews($filesDir, $me) {
+    $meEmail = strtolower(trim($me['email'] ?? ''));
+    if ($meEmail === '') return [];
+    $items = [];
+    foreach (iter_owner_metas() as [$u, $o]) {
+        if (strtolower(trim($o['email'] ?? '')) !== $meEmail) continue;
         if (isset($o['review_request'])) continue;   // 依頼の原稿は履歴でなく「依頼したチェック」へ
         if (!empty($o['received_src'])) continue;     // LabPayから受領した原稿のコピーは履歴に出さない
-        $u = $m[1];
         if (!is_file($filesDir . $u . '.pdf')) continue;   // 実体が無いものは除外
         $items[] = [
             'uuid'    => $u,
@@ -156,13 +176,9 @@ function list_requests_out($filesDir, $me) {
     $meEmail = strtolower(trim($me['email'] ?? ''));
     if ($meEmail === '') return [];
     $items = [];
-    $metaDir = meta_dir();
-    foreach (@scandir($metaDir) ?: [] as $fn) {
-        if (!preg_match('/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.json$/i', $fn, $m)) continue;
-        $o = json_decode(@file_get_contents($metaDir . $fn), true);
-        if (!is_array($o) || !isset($o['review_request'])) continue;
+    foreach (iter_owner_metas() as [$u, $o]) {
+        if (!isset($o['review_request'])) continue;
         if (strtolower(trim($o['email'] ?? '')) !== $meEmail) continue;
-        $u = $m[1];
         if (!is_file($filesDir . $u . '.pdf')) continue;
         $rr = $o['review_request'];
         $reviewers = [];
@@ -181,15 +197,11 @@ function list_requests_in($filesDir, $me) {
     $meEmail = strtolower(trim($me['email'] ?? ''));
     if ($meUser === '') return [];
     $items = [];
-    $metaDir = meta_dir();
-    foreach (@scandir($metaDir) ?: [] as $fn) {
-        if (!preg_match('/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.json$/i', $fn, $m)) continue;
-        $o = json_decode(@file_get_contents($metaDir . $fn), true);
-        if (!is_array($o) || !isset($o['review_request'])) continue;
+    foreach (iter_owner_metas() as [$u, $o]) {
+        if (!isset($o['review_request'])) continue;
         if (strtolower(trim($o['email'] ?? '')) === $meEmail) continue;   // 自分の依頼は out 側
         $rv = $o['review_request']['reviewers'][$meUser] ?? null;
         if (!is_array($rv)) continue;
-        $u = $m[1];
         if (!is_file($filesDir . $u . '.pdf')) continue;
         $items[] = [
             'uuid'      => $u,
@@ -212,15 +224,10 @@ function list_shared_reviews($filesDir, $me) {
     $meEmail = strtolower(trim($me['email'] ?? ''));
     if ($meUser === '') return [];
     $items = [];
-    $metaDir = meta_dir();
-    foreach (@scandir($metaDir) ?: [] as $fn) {
-        if (!preg_match('/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.json$/i', $fn, $m)) continue;
-        $o = json_decode(@file_get_contents($metaDir . $fn), true);
-        if (!is_array($o)) continue;
+    foreach (iter_owner_metas() as [$u, $o]) {
         $recips = is_array($o['recipients'] ?? null) ? $o['recipients'] : [];
         if (!in_array($meUser, $recips, true)) continue;
         if (strtolower(trim($o['email'] ?? '')) === $meEmail) continue;   // 自分所有は items 側
-        $u = $m[1];
         if (!is_file($filesDir . $u . '.pdf')) continue;
         $items[] = [
             'uuid'    => $u,
@@ -359,11 +366,14 @@ function finfo_mime($tmpPath) {
 }
 
 function require_same_origin_if_possible() {
-    // 最低限。Origin が取れないケースもあるので厳格にはしない。
+    // Origin ヘッダがあるリクエスト(主にPOST)だけ検査。取れないケース(GET等)は通す。
     if (!empty($_SERVER['HTTP_ORIGIN'])) {
         $origin = $_SERVER['HTTP_ORIGIN'];
-        $host = (isset($_SERVER['HTTPS']) ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'];
-        if (stripos($origin, $host) !== 0) {
+        $host = (isset($_SERVER['HTTPS']) ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? '');
+        // ★scheme+host(+port) の完全一致で判定する。
+        //   旧実装は stripos($origin,$host)!==0 の前方一致で、
+        //   https://pr.nkmr.io.evil.com のような偽装オリジンを素通しさせていた。
+        if (strcasecmp($origin, $host) !== 0) {
             json_error('Forbidden origin', 403);
         }
     }
@@ -864,6 +874,8 @@ if ($method === 'GET' && isset($_GET['uuid'])) {
             'annotations' => $jsonData
         ];
         if (file_exists($audioFile)) $resp['audio'] = 'files/' . $uuid . '.m4a';
+        // ノイズ除去＋音量調整した「クリーン音声」が生成済みなら併せて返す（任意・無ければ元音のみ）
+        if (file_exists($targetDir . $uuid . '.clean.m4a')) $resp['audioClean'] = 'files/' . $uuid . '.clean.m4a';
 
         // ログイン中で、自分の校正（または所有者未記録の旧データ）なら削除可
         $resp['canDelete'] = can_delete($uuid, $me);
