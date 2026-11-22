@@ -2,7 +2,7 @@ import { pdfScale, paths } from './pdfHandler.js';
 import { calculateMedianPressure } from './subModule.js';
 import { updateButtons } from './UIHandler.js';
 import { generateSVGPath, addPathAnimation } from './htmlHandler.js';
-import { logAddStroke, logEraseStrokes } from './timelineHandler.js';
+import { logAddStroke, logEraseStrokes, getFinalErasedSet } from './timelineHandler.js';
 import { getViewScale } from './viewportHandler.js';
 import { appState } from './appState.js';
 
@@ -317,9 +317,12 @@ export function redrawVisibleNow() {
 
   const pageStrokes = paths[appState.currentPageNum] || [];
   const hidden = getHiddenSet(appState.currentPageNum);
+  // 閲覧データ（録音の再生/静的モード）では消去は hidden でなく timeline events に入るので、
+  // そちらの最終消去集合も合わせて除外する（消したはずの線が出ないように）。
+  const erasedTl = getFinalErasedSet(appState.currentPageNum);
 
   // id無しはここで付与済みのはず
-  const visible = pageStrokes.filter(s => s && s.id && !hidden.has(s.id));
+  const visible = pageStrokes.filter(s => s && s.id && !hidden.has(s.id) && !erasedTl.has(s.id));
   redrawFromStrokes(visible, pdfScale);
 }
 

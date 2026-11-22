@@ -14,6 +14,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/nkmrauth.php';
 require_once __DIR__ . '/config_util.php';   // local_config()（api.phpと共用）
 require_once __DIR__ . '/pr_access.php';      // can_view_review()（api.phpと共用）
+require_once __DIR__ . '/pr_util.php';        // is_valid_uuid()（api.phpと共用）
 
 // 研究室ログイン限定
 $me = nkmrauth_identity();
@@ -28,9 +29,7 @@ function j_err($m, $c = 400) {
     echo json_encode(['status' => 'error', 'message' => $m], JSON_UNESCAPED_UNICODE);
     exit;
 }
-function is_valid_uuid($u) {
-    return is_string($u) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $u);
-}
+// is_valid_uuid() は pr_util.php に集約（api.php と共用）。
 
 // ハルシネーション抑制のしきい値（Whisper既定に準拠。ボソボソ音声で本物を消しすぎない設定）
 const NO_SPEECH_MAX  = 0.6;    // これ以上の無発話確率＋低信頼なら無音幻聴として捨てる

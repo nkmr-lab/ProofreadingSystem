@@ -143,6 +143,13 @@ function computeErasedSetAt(timeMs, pageNum) {
   return erased;
 }
 
+// 全イベントを通じて最終的に消された（erase された）ストローク id の集合（再生時刻に依らない最終状態）。
+// 閲覧データでは消去は hidden セットでなく events に入るため、静的モード/全書き込み表示で
+// 「消したはずの線」を出さないようにこれで除外する。
+export function getFinalErasedSet(pageNum) {
+  return computeErasedSetAt(Infinity, pageNum);
+}
+
 // ts で「この時刻までに書き終えたストローク」を返す
 function lastTsOfStroke(stroke) {
   const pts = stroke?.points;

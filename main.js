@@ -16,6 +16,7 @@ import { initStaticUI } from './staticHandler.js';
 import { loadMyHistory, bindHistoryReload } from './historyHandler.js';
 import { openShareDialog } from './shareHandler.js';
 import { hud, hudEnabled } from './debugHud.js';
+import { setDebugEnabled } from './debugOverlay.js';
 import { initRequestUI, loadRequestForCheck, loadInReviewForCheck, loadReviewForRecheck } from './requestHandler.js';
 
 document.addEventListener('keydown', (event) => keydownEvent(event));
@@ -104,6 +105,11 @@ attachEdgeSwipeNav(_pdfSVGEl);   // Pen ON/Touch OFF 時、指の横スワイプ
 
 // デバッグHUD(?dbg=1)：起動を1行出し、SVGに届く生ポインタイベントを常時記録。
 // 描画が壊れている/リスナ未装着でも「イベントがSVGに届いているか」を切り分けられる。
+// audioHandler の録音診断(dbg=debugOverlay)も同じ ?dbg フラグで有効化する。
+// 以前は setDebugEnabled を誰も呼ばず、録音まわりの dbg() が常に無反応(デッド)だった。
+// hud(左上・ポインタ系) と debugOverlay(右下・録音系) は別コーナーなので併用しても重ならない。
+setDebugEnabled(hudEnabled());
+
 if (hudEnabled()) {
   hud('HUD ready (dbg on). 描けない時のイベントを記録します');
   const raw = (tag) => (e) => hud(`raw ${tag} ${e.pointerType} id=${e.pointerId} p=${(e.pressure||0).toFixed(2)} b=${e.buttons}`);

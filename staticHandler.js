@@ -7,6 +7,7 @@ import { pdfDoc, paths, pdfScale, renderPage } from './pdfHandler.js';
 import { redrawFromStrokes } from './drawingHandler.js';
 import { updateButtons } from './UIHandler.js';
 import { resetView } from './viewportHandler.js';
+import { getFinalErasedSet } from './timelineHandler.js';
 
 let panelEl = null, thumbsEl = null;
 const savedDisp = {};   // 静的モード突入前の文字起こし/査読ボタンの表示状態を覚える
@@ -147,11 +148,13 @@ async function renderThumb(canvas, p){
 // ストロークはページ座標(scale=1)で保存されているので ×ts でサムネへ描く
 function drawInk(ctx, pageNum, ts){
   const strokes = paths[pageNum] || [];
+  const erased = getFinalErasedSet(pageNum);   // 消去済み(timeline events)はサムネにも出さない
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.strokeStyle = 'rgba(220,0,0,0.9)';
   ctx.lineWidth = Math.max(1, 2.5 * ts);
   for (const s of strokes){
+    if (s && s.id && erased.has(s.id)) continue;
     const pts = s && s.points;
     if (!Array.isArray(pts) || pts.length < 1) continue;
     ctx.beginPath();

@@ -3,7 +3,7 @@
 //  - 作成者のみ: 「みんなに公開」か「指定した人だけ」を選び、研究室メンバーから相手を選択
 // 相手は username（roster）で保持。api.php {action:'recipients'} に保存し、閲覧は api.php GET が制御。
 import { appState } from './appState.js';
-import { escapeHtml, GRADE_ORDER, fetchRoster } from './subModule.js';
+import { escapeHtml, fetchRoster, renderMemberPicker, setPickerStatus } from './subModule.js';
 
 function shareUrl(){ return location.origin + '/' + appState.uuid; }
 
@@ -94,24 +94,9 @@ function reflectVis(){
   if (m) m.style.display = (vis === 'public') ? 'none' : '';
 }
 
+// 共有相手は全学年が候補・現在の指定相手を既定チェックにする（data-name は不要）。
 function renderMembers(users, selected){
-  const sel = new Set(selected);
-  const byGrade = {};
-  for (const u of users){ (byGrade[u.grade] ||= []).push(u); }
-  const grades = Object.keys(byGrade).sort((a,b)=>{
-    const ia = GRADE_ORDER.indexOf(a), ib = GRADE_ORDER.indexOf(b);
-    return (ia<0?99:ia) - (ib<0?99:ib);
-  });
-  let html = '';
-  for (const g of grades){
-    html += `<div class="share-grade">${escapeHtml(g || 'その他')}</div><div class="share-grade-list">`;
-    for (const u of byGrade[g]){
-      const checked = sel.has(u.user) ? ' checked' : '';
-      html += `<label class="share-member"><input type="checkbox" value="${escapeHtml(u.user)}"${checked}> ${escapeHtml(u.name || u.user)}</label>`;
-    }
-    html += '</div>';
-  }
-  return html;
+  return renderMemberPicker(users, { selected });
 }
 
 async function saveRecipients(){
@@ -148,8 +133,5 @@ async function saveRecipients(){
 }
 
 function setStatus(msg, isErr){
-  const el = document.getElementById('shareStatus');
-  if (!el) return;
-  el.textContent = msg;
-  el.style.color = isErr ? 'var(--danger)' : 'var(--muted)';
+  setPickerStatus(document.getElementById('shareStatus'), msg, isErr);
 }

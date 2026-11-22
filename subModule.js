@@ -36,6 +36,46 @@ export async function fetchRoster(){
     return _rosterCache;
 }
 
+// 学年を昇順（教員→B1、GRADE_ORDER順。未知の学年は末尾）に並べる。share/request 共用。
+export function sortGradesAsc(grades){
+  return grades.slice().sort((a, b) => {
+    const ia = GRADE_ORDER.indexOf(a), ib = GRADE_ORDER.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+}
+
+// 研究室メンバーを学年ごとにまとめたチェックボックス群のHTMLを返す。
+// shareHandler（共有相手）と requestHandler（依頼相手）で重複していた描画を共通化。
+//   opts.selected   : 既定でチェックする user 配列（共有の現在値など）
+//   opts.gradeFilter : 表示する学年の Set（未指定＝全員。依頼は REVIEWER_GRADES で絞る）
+//   opts.withName   : <input> に data-name を付けるか（依頼は選択時に表示名が要る）
+export function renderMemberPicker(users, { selected = [], gradeFilter = null, withName = false } = {}){
+  const sel = new Set(selected);
+  const byGrade = {};
+  for (const u of users){
+    if (gradeFilter && !gradeFilter.has(u.grade)) continue;
+    (byGrade[u.grade] ||= []).push(u);
+  }
+  let html = '';
+  for (const g of sortGradesAsc(Object.keys(byGrade))){
+    html += `<div class="share-grade">${escapeHtml(g || 'その他')}</div><div class="share-grade-list">`;
+    for (const u of byGrade[g]){
+      const checked  = sel.has(u.user) ? ' checked' : '';
+      const nameAttr = withName ? ` data-name="${escapeHtml(u.name || u.user)}"` : '';
+      html += `<label class="share-member"><input type="checkbox" value="${escapeHtml(u.user)}"${checked}${nameAttr}> ${escapeHtml(u.name || u.user)}</label>`;
+    }
+    html += '</div>';
+  }
+  return html;
+}
+
+// 共有/依頼モーダルのステータス行表示。el は status 要素。share/request 共用。
+export function setPickerStatus(el, msg, isErr){
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = isErr ? 'var(--danger)' : 'var(--muted)';
+}
+
 export function calculateMedianPressure(_points) {
     if (!_points.length) return 0;
     const pressures = _points.map(point => point.pressure).sort((a, b) => a - b);

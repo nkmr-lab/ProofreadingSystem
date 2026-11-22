@@ -3,7 +3,7 @@
 //  レビュアー: /?req=<uuid> で原稿をチェック(録音)モードで開き、保存で結果が依頼に紐づく。
 import { appState } from './appState.js';
 import { loadPdfFile } from './pdfHandler.js';
-import { escapeHtml, GRADE_ORDER, fetchRoster } from './subModule.js';
+import { escapeHtml, fetchRoster, renderMemberPicker, setPickerStatus } from './subModule.js';
 
 // ===== 依頼者側：作成フロー =====
 export function initRequestUI(){
@@ -76,22 +76,9 @@ function closeRequestModal(){ document.getElementById('reqBackdrop')?.remove(); 
 // チェックを依頼できる相手の学年（OB・B2以下は候補に出さない）
 const REVIEWER_GRADES = new Set(['教員', 'D3', 'D2', 'D1', 'M2', 'M1', 'B4', 'B3']);
 
+// 依頼相手の候補はチェックしてもらえる学年のみ・選択時に表示名が要るので data-name 付き。
 function renderMembers(users){
-  const byGrade = {};
-  for (const u of users){ if (!REVIEWER_GRADES.has(u.grade)) continue; (byGrade[u.grade] ||= []).push(u); }
-  const grades = Object.keys(byGrade).sort((a,b)=>{
-    const ia = GRADE_ORDER.indexOf(a), ib = GRADE_ORDER.indexOf(b);
-    return (ia<0?99:ia) - (ib<0?99:ib);
-  });
-  let html = '';
-  for (const g of grades){
-    html += `<div class="share-grade">${escapeHtml(g || 'その他')}</div><div class="share-grade-list">`;
-    for (const u of byGrade[g]){
-      html += `<label class="share-member"><input type="checkbox" value="${escapeHtml(u.user)}" data-name="${escapeHtml(u.name || u.user)}"> ${escapeHtml(u.name || u.user)}</label>`;
-    }
-    html += '</div>';
-  }
-  return html;
+  return renderMemberPicker(users, { gradeFilter: REVIEWER_GRADES, withName: true });
 }
 
 async function sendRequest(uuid){
@@ -118,8 +105,7 @@ async function sendRequest(uuid){
   }
 }
 function setStatus(msg, isErr){
-  const el = document.getElementById('reqStatus');
-  if (el){ el.textContent = msg; el.style.color = isErr ? 'var(--danger)' : 'var(--muted)'; }
+  setPickerStatus(document.getElementById('reqStatus'), msg, isErr);
 }
 
 // ===== レビュアー側：依頼の原稿をチェックモードで開く（/?req=<uuid>） =====

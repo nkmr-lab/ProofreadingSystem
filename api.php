@@ -3,6 +3,7 @@ header('Content-Type: application/json');
 
 // nkmr SSO: サーバ保存（アップロード）はログイン必須。閲覧(GET)は従来どおり公開。
 require_once __DIR__ . '/nkmrauth.php';
+require_once __DIR__ . '/pr_util.php';   // is_valid_uuid（transcribe.php と共用）
 function require_login() {
     $id = nkmrauth_identity();          // リダイレクトせず身元だけ確認
     if (!$id) {
@@ -35,9 +36,7 @@ function generateUUIDv4() {
     return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
 }
 
-function is_valid_uuid($uuid) {
-    return is_string($uuid) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $uuid);
-}
+// is_valid_uuid() は pr_util.php に集約（transcribe.php と共用）。
 
 function safe_path($dir, $uuid, $ext) {
     // uuidチェック済みを前提。パストラバーサルを完全に殺す
@@ -668,6 +667,11 @@ if ($method === 'POST') {
         // ★重要：PDFが存在するuuidのみ保存を許可
         if (!file_exists_for_uuid($targetDir, $uuid)) json_error('Unknown uuid (pdf not found)', 403);
 
+        // ★作成者本人（または所有者未記録の旧データ）のみ保存可。
+        //   正規フローでは録音開始時に本人がPDFをアップロードして uuid を作る＝保存先は必ず本人所有。
+        //   この関所が無いと、ログイン済みの研究室メンバーが他人の uuid の注釈を上書きできてしまう。
+        if (!can_delete($uuid, $me)) json_error('この原稿を保存する権限がありません（作成者のみ）', 403);
+
         // data は「文字列(JSONテキスト)」を想定
         $data = $input['data'];
         if (!is_string($data)) json_error('data must be string');
@@ -686,12 +690,15 @@ if ($method === 'POST') {
 
     // ---- 2) 音声アップロード（multipart: uuid + audio）----
     if (isset($_POST['uuid']) && isset($_FILES['audio']) && $_FILES['audio']['error'] === UPLOAD_ERR_OK) {
-        require_login();
+        $me = require_login();
         $uuid = $_POST['uuid'];
         if (!is_valid_uuid($uuid)) json_error('Invalid uuid');
 
         // ★重要：PDFが存在するuuidのみアップロードを許可
         if (!file_exists_for_uuid($targetDir, $uuid)) json_error('Unknown uuid (pdf not found)', 403);
+
+        // ★作成者本人（または旧データ）のみ音声を保存可（注釈保存と同じ理由＝他人uuidへの上書き防止）。
+        if (!can_delete($uuid, $me)) json_error('この原稿に音声を保存する権限がありません（作成者のみ）', 403);
 
         if ($_FILES['audio']['size'] > MAX_AUDIO_BYTES) json_error('Audio too large');
 
