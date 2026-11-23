@@ -3,6 +3,9 @@ import { updateButtons } from './UIHandler.js';
 import { logPage, isRecordingTimeline } from './timelineHandler.js';
 import { resetView } from './viewportHandler.js';
 import { appState } from './appState.js';
+// pdf.js は ESM で直接 import（旧: index.php の classic <script> → window['pdfjs-dist/build/pdf']）。
+// legacy build を使うのは古い iOS Safari 等での手書き描画互換を優先するため。worker/cmaps も同版で揃える。
+import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.5.438/legacy/build/pdf.min.mjs';
 
 const base_url = "https://pr.nkmr.io";
 
@@ -11,9 +14,8 @@ const base_url = "https://pr.nkmr.io";
 const ZOOM_SUPERSAMPLE = 3;   // devicePixelRatio に掛ける供給解像度係数
 const MAX_SUPERSAMPLE  = 6;   // 供給解像度の上限倍率
 const MAX_CANVAS_PX    = 3800; // キャンバス長辺の上限(px)
-const pdf_js_url = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.9.359/pdf.worker.min.js';
-const pdf_js_dist_url = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.9.359/cmaps/';
-const pdfjsLib = window['pdfjs-dist/build/pdf'];
+const pdf_js_url = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.5.438/legacy/build/pdf.worker.min.mjs';
+const pdf_js_dist_url = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.5.438/cmaps/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdf_js_url;
 
 export let pdfDoc = null;
@@ -33,7 +35,8 @@ export async function getFirstPageText(maxChars = 2000){
   try {
     const page = await pdfDoc.getPage(1);
     const tc = await page.getTextContent();
-    const s = tc.items.map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
+    // pdf.js v4+ は items にマーク済みコンテンツ（.str を持たない）が混じることがあるので除外。
+    const s = tc.items.filter(it => typeof it.str === 'string').map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
     return s.slice(0, maxChars);
   } catch (e) {
     console.warn('getFirstPageText failed', e);

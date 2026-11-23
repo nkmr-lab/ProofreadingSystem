@@ -17,7 +17,7 @@ $logoutUrl = nkmrauth_logout_url();
     <title>Proofreading System</title>
 
     <link rel="stylesheet" href="styles.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.9.359/pdf.min.js"></script>
+    <!-- pdf.js は pdfHandler.js 内で ESM import（import * as pdfjsLib from '…/pdf.min.mjs'）。classic <script> は不要。 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script type="module" src="main.js"></script>
 
